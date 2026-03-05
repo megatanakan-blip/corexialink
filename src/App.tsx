@@ -44,7 +44,7 @@ const HomeRedirect = () => {
 function App() {
   return (
     <AuthProvider>
-      <Router>
+      <Router basename="/corexialink/">
         <Routes>
           {/* Public pages - no guards to avoid race conditions during signup */}
           <Route path="/login" element={<Login />} />
