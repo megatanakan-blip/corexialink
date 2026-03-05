@@ -21,7 +21,8 @@ const ProtectedRoute = () => {
   }
 
   if (!currentUser) {
-    return <div className="h-screen flex items-center justify-center bg-slate-50"><Loader2 className="animate-spin text-brand-blue" /></div>;
+    // Authenticated but no Firestore profile - show pending/contact page
+    return <Navigate to="/pending" replace />;
   }
 
   if (!currentUser.isApproved) {
