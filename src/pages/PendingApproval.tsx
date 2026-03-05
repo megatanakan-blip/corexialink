@@ -10,7 +10,7 @@ export const PendingApproval: React.FC = () => {
         await auth.signOut();
         // Use full page reload to avoid React DOM reconciliation crash
         // that occurs when auth state changes and navigate() fire simultaneously
-        window.location.href = '/login';
+        window.location.href = import.meta.env.BASE_URL + 'login';
     };
 
     return (

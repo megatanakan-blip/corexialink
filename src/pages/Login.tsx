@@ -19,7 +19,7 @@ export const Login: React.FC = () => {
             await signInWithEmailAndPassword(auth, email, password);
             // Use full page reload to avoid React DOM reconciliation crash
             // that occurs when auth state changes and navigate() fire simultaneously
-            window.location.href = '/';
+            window.location.href = import.meta.env.BASE_URL;
         } catch (err: any) {
             console.error('Login error:', err);
             setError('ログインに失敗しました。メールアドレスとパスワードを確認してください。');
