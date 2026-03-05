@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../firebaseConfig';
 import { LogIn, Mail, Lock, Loader2 } from 'lucide-react';
@@ -9,7 +9,6 @@ export const Login: React.FC = () => {
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
-    const navigate = useNavigate();
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -18,11 +17,12 @@ export const Login: React.FC = () => {
 
         try {
             await signInWithEmailAndPassword(auth, email, password);
-            navigate('/');
+            // Use full page reload to avoid React DOM reconciliation crash
+            // that occurs when auth state changes and navigate() fire simultaneously
+            window.location.href = '/';
         } catch (err: any) {
             console.error('Login error:', err);
             setError('ログインに失敗しました。メールアドレスとパスワードを確認してください。');
-        } finally {
             setLoading(false);
         }
     };
@@ -36,7 +36,17 @@ export const Login: React.FC = () => {
                 </div>
 
                 <form onSubmit={handleLogin} className="p-8 space-y-6">
-                    {error && <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm">{error}</div>}
+                    {/* Always-present error box: hidden via style to avoid DOM node removal */}
+                    <div
+                        className="rounded-lg text-sm p-3"
+                        style={{
+                            display: error ? 'block' : 'none',
+                            backgroundColor: '#fef2f2',
+                            color: '#dc2626',
+                        }}
+                    >
+                        {error}
+                    </div>
 
                     <div className="space-y-4">
                         <div className="relative">
@@ -68,7 +78,14 @@ export const Login: React.FC = () => {
                         disabled={loading}
                         className="w-full bg-brand-blue text-white font-bold py-4 rounded-xl hover:bg-brand-blue-dark transition-all shadow-lg shadow-brand-blue/30 flex items-center justify-center gap-2"
                     >
-                        {loading ? <Loader2 className="animate-spin" /> : <><LogIn size={20} /> ログイン</>}
+                        {/* Stable DOM: both spans always present, toggled via style */}
+                        <span style={{ display: loading ? 'none' : 'flex', alignItems: 'center', gap: '8px' }}>
+                            <LogIn size={20} />
+                            ログイン
+                        </span>
+                        <span style={{ display: loading ? 'flex' : 'none', alignItems: 'center' }}>
+                            <Loader2 className="animate-spin" />
+                        </span>
                     </button>
 
                     <div className="text-center mt-4">

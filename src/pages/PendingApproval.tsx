@@ -1,14 +1,16 @@
 import React from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { ShieldCheck, LogOut } from 'lucide-react';
+import { ShieldCheck, Home } from 'lucide-react';
 import { auth } from '../firebaseConfig';
 
 export const PendingApproval: React.FC = () => {
-    console.log("PendingApproval component mounted");
     const { currentUser } = useAuth();
 
-    const handleLogout = () => {
-        auth.signOut();
+    const handleGoTop = async () => {
+        await auth.signOut();
+        // Use full page reload to avoid React DOM reconciliation crash
+        // that occurs when auth state changes and navigate() fire simultaneously
+        window.location.href = '/login';
     };
 
     return (
@@ -19,12 +21,19 @@ export const PendingApproval: React.FC = () => {
                 </div>
 
                 <div>
-                    <h2 className="text-2xl font-bold text-slate-800">承認待ちです</h2>
-                    <p className="text-slate-500 mt-2">
-                        申請を受け付けました。<br />
-                        管理者による承認が完了するまでお待ちください。<br />
-                        承認完了後、ログインが可能になります。
-                    </p>
+                    <h2 className="text-2xl font-black text-slate-800 tracking-tight">登録申請を受け付けました</h2>
+                    <div className="mt-6 bg-blue-50 border border-blue-100 p-6 rounded-2xl text-blue-900 shadow-sm">
+                        <p className="text-sm font-bold leading-relaxed">
+                            登録承認メールが届くまで少々お待ちください。<br />
+                            基本的に24時間以内に承認メールが届きますが、<br />
+                            万が一届かない場合はお手数ですが<br />
+                            <span className="text-lg block mt-2 text-brand-blue">
+                                0155-35-6815<br />
+                                大栄管機、田中まで
+                            </span>
+                            お問い合わせください。
+                        </p>
+                    </div>
                 </div>
 
                 <div className="text-left bg-slate-50 p-4 rounded-xl border border-slate-100">
@@ -38,11 +47,11 @@ export const PendingApproval: React.FC = () => {
                 </div>
 
                 <button
-                    onClick={handleLogout}
-                    className="w-full py-3 text-slate-500 hover:text-red-500 transition-colors font-medium flex items-center justify-center gap-2"
+                    onClick={handleGoTop}
+                    className="w-full py-3 bg-brand-blue text-white font-bold rounded-xl hover:bg-brand-blue-dark transition-colors flex items-center justify-center gap-2 shadow-lg shadow-brand-blue/20"
                 >
-                    <LogOut size={18} />
-                    ログアウト
+                    <Home size={18} />
+                    トップへ戻る
                 </button>
             </div>
         </div>

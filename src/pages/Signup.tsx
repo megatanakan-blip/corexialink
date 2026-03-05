@@ -18,6 +18,12 @@ export const Signup: React.FC = () => {
 
     const handleSignup = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        if (password.length < 6) {
+            setError('パスワードは6文字以上で設定してください。');
+            return;
+        }
+
         setLoading(true);
         setError('');
 
@@ -31,7 +37,7 @@ export const Signup: React.FC = () => {
                 displayName,
                 companyName,
                 phoneNumber,
-                role: 'pending', // Default to pending/lite until approved/assigned
+                role: 'pending',
                 isApproved: false,
                 createdAt: new Date().toISOString(),
                 updatedAt: new Date().toISOString(),
@@ -42,7 +48,11 @@ export const Signup: React.FC = () => {
             navigate('/pending');
         } catch (err: any) {
             console.error('Signup error:', err);
-            setError('登録に失敗しました。入力内容を確認してください。(' + err.message + ')');
+            if (err.code === 'auth/email-already-in-use') {
+                setError('このメールアドレスは既に登録されています。ログインをお試しください。万が一ログインできない場合は 0155-35-6815 大栄管機、田中までお問い合わせください。');
+            } else {
+                setError('登録に失敗しました: ' + err.message);
+            }
         } finally {
             setLoading(false);
         }
@@ -57,7 +67,17 @@ export const Signup: React.FC = () => {
                 </div>
 
                 <form onSubmit={handleSignup} className="p-8 space-y-4">
-                    {error && <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm">{error}</div>}
+                    {/* Always-present error box: hidden via style to avoid DOM node removal */}
+                    <div
+                        className="rounded-lg text-sm p-3"
+                        style={{
+                            display: error ? 'block' : 'none',
+                            backgroundColor: '#fef2f2',
+                            color: '#dc2626',
+                        }}
+                    >
+                        {error}
+                    </div>
 
                     <div className="space-y-4">
                         <div className="relative">
@@ -75,11 +95,12 @@ export const Signup: React.FC = () => {
                             <Lock className="absolute left-3 top-3 text-slate-400" size={20} />
                             <input
                                 type="password"
-                                placeholder="パスワード"
+                                placeholder="パスワード（6文字以上）"
                                 className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent transition-all"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                                 required
+                                minLength={6}
                             />
                         </div>
                         <div className="relative">
@@ -122,7 +143,14 @@ export const Signup: React.FC = () => {
                         disabled={loading}
                         className="w-full bg-brand-blue text-white font-bold py-4 rounded-xl hover:bg-brand-blue-dark transition-all shadow-lg shadow-brand-blue/30 flex items-center justify-center gap-2"
                     >
-                        {loading ? <Loader2 className="animate-spin" /> : <><UserPlus size={20} /> 登録申請を送る</>}
+                        {/* Stable DOM: both spans always present, toggled via style */}
+                        <span style={{ display: loading ? 'none' : 'flex', alignItems: 'center', gap: '8px' }}>
+                            <UserPlus size={20} />
+                            登録申請を送る
+                        </span>
+                        <span style={{ display: loading ? 'flex' : 'none', alignItems: 'center' }}>
+                            <Loader2 className="animate-spin" />
+                        </span>
                     </button>
 
                     <div className="text-center mt-4">
