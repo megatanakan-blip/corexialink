@@ -50,8 +50,9 @@ export const chatWithTakahashi = async (messages: any[], masterItems: MaterialIt
 
     const apiKey = (import.meta as any).env?.VITE_GEMINI_API_KEY;
     // APIキーがない、またはプレースホルダーの場合はモックモード
+    console.log("[AI Takahashi] API key present:", !!apiKey, "length:", apiKey?.length);
     if (!apiKey || (typeof apiKey === 'string' && (apiKey.includes('PLACEHOLDER') || apiKey === ""))) {
-        // Mock logic (simplified for brevity as main focus is connecting with new SDK)
+        console.warn("[AI Takahashi] Running in MOCK MODE - no API key");
         return {
             text: "あ、高橋です。APIキーが見つからないのでモックモードで動いています。",
             candidates: [],
@@ -72,7 +73,7 @@ export const chatWithTakahashi = async (messages: any[], masterItems: MaterialIt
 
         const ai = getAi();
         const response = await ai.models.generateContent({
-            model: 'gemini-3-flash-preview',
+            model: 'gemini-2.0-flash-lite',
             contents: contents, // Note: new SDK might expect 'contents' array directly
             config: {
                 systemInstruction: { parts: [{ text: systemInstruction }] }, // New SDK format for system instruction
