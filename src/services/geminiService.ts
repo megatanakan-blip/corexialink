@@ -5,14 +5,97 @@ import { domainKnowledge } from './domainKnowledge';
 // APIキーは環境変数から取得
 const getAi = () => new GoogleGenAI({ apiKey: (import.meta as any).env?.VITE_GEMINI_API_KEY || "" });
 
-export const chatWithTakahashi = async (messages: any[], masterItems: MaterialItem[], screenContext: string = "LINK_LITE") => {
-    // 在庫情報をコンパクトにまとめてAIに渡す（トークン節約と精度向上のため）
-    const knowledgeBase = masterItems.slice(0, 150).map(i => ({
+// 業界用語シノニム辞書（現場用語 → 検索キーワード群）
+const INDUSTRY_SYNONYMS: Record<string, string[]> = {
+    // エルボ・曲管系
+    'エルボ': ['エルボ', 'エル', 'elbow', 'el', '90l', '90°l', '45l', '45°l', 'LD', 'LS', 'LL', '曲管', 'エルボー'],
+    'エル': ['エルボ', 'エル', '90L', '90°L', 'L', 'LL', 'LS', 'LD', 'エルボー', '曲管'],
+    // チーズ・三叉管系
+    'チーズ': ['チーズ', 'ティー', 'tee', 'tj', 'ts', 'tl', 'T管', '三叉', '分岐'],
+    'ティー': ['チーズ', 'T', 'TJ', 'TS', 'TL', 'ティ', '三叉', '分岐'],
+    'ティ': ['チーズ', 'T', 'TJ', 'TS', '三叉'],
+    // ソケット系
+    'ソケット': ['ソケット', 'socket', 'sk', 'S', '継手'],
+    // ニップル系
+    'ニップル': ['ニップル', 'nipple', 'np', 'NI'],
+    // ユニオン系
+    'ユニオン': ['ユニオン', 'union', 'un'],
+    // フランジ系
+    'フランジ': ['フランジ', 'flange', 'fl', 'FF', 'RF'],
+    // バルブ系
+    'バルブ': ['バルブ', 'valve', 'VLV', 'V'],
+    'ゲートバルブ': ['ゲートバルブ', 'gate', 'GV', 'ゲート'],
+    'ボールバルブ': ['ボールバルブ', 'ball', 'BV', 'ボール'],
+    'グローブバルブ': ['グローブバルブ', 'globe', 'GLV', 'グローブ'],
+    'チェックバルブ': ['チェックバルブ', 'check', 'CV', 'チェック', '逆止'],
+    // キャップ・プラグ
+    'キャップ': ['キャップ', 'cap', 'CP', '盲'],
+    'プラグ': ['プラグ', 'plug', 'PL'],
+    // レジューサー・異径系
+    'レジューサー': ['レジューサー', 'reducer', 'RD', 'レデューサ', '異径'],
+    // 鋼管系（白ガス・黒管・白管）
+    '黒管': ['黒管', '黒SGP', 'SGP黒', '配管用炭素鋼鋼管', 'SGP', 'ガス管', 'GP'],
+    '白管': ['白管', '白SGP', 'SGP白', '白ガス管'],
+    '白ガス管': ['白SGP', 'SGP白', '白管', 'ガス管', 'SGP'],
+    'SGP': ['SGP', '黒管', '白管', '配管用炭素鋼鋼管', 'ガス管'],
+    // ステンレス系（モルコ管など）
+    'モルコ管': ['SU', 'SUS', 'ステンレス', 'モルコ', 'SA', 'SUS配管'],
+    'モルコ': ['SU', 'SUS', 'ステンレス', 'モルコ管'],
+    'SUS': ['SUS', 'SU', 'ステンレス', 'stainless', 'SA', 'モルコ管'],
+    // 塩ビ系
+    'VP': ['VP', '塩ビ', '塩化ビニル', 'PVC'],
+    'VU': ['VU', '薄肉塩ビ', '排水用'],
+    'HI': ['HI', '耐衝撃', '強化塩ビ'],
+    // ポリ系
+    'PE': ['PE', 'ポリ', 'ポリエチレン'],
+    'PP': ['PP', 'ポリプロ', 'ポリプロピレン'],
+    // 工具系
+    'パイレン': ['パイプレンチ', 'パイレン'],
+    '全ねじ': ['全ねじ', '寸切り', '寸切', '全ネジ'],
+    'バンド': ['バンド', 'ハンガー', '吊り', '吊バンド', '吊りバンド'],
+};
+
+const expandSearchTerms = (text: string): string[] => {
+    const lower = text.toLowerCase();
+    const terms = new Set<string>([lower]);
+    for (const [key, synonyms] of Object.entries(INDUSTRY_SYNONYMS)) {
+        const allVariants = [key.toLowerCase(), ...synonyms.map(s => s.toLowerCase())];
+        if (allVariants.some(v => lower.includes(v))) {
+            synonyms.forEach(s => terms.add(s.toLowerCase()));
+            terms.add(key.toLowerCase());
+        }
+    }
+    return Array.from(terms);
+};
+
+const buildSmartKnowledgeBase = (masterItems: MaterialItem[], messages: any[]) => {
+    const lastUserMsg = [...messages].reverse().find((m: any) => m.role === 'user');
+    const userText = lastUserMsg?.parts?.[0]?.text || '';
+    const searchTerms = expandSearchTerms(userText);
+
+    const matched: MaterialItem[] = [];
+    const others: MaterialItem[] = [];
+
+    for (const item of masterItems) {
+        const haystack = [item.name, item.model, item.dimensions, item.category, item.notes]
+            .join(' ').toLowerCase();
+        const score = searchTerms.reduce((s, term) => s + (haystack.includes(term) ? 1 : 0), 0);
+        if (score > 0) matched.push(item);
+        else others.push(item);
+    }
+
+    const combined = [...matched, ...others.slice(0, 50)];
+    return combined.map(i => ({
         id: i.id, n: i.name, m: i.model, d: i.dimensions, c: i.category
     }));
+};
+
+export const chatWithTakahashi = async (messages: any[], masterItems: MaterialItem[], screenContext: string = "LINK_LITE") => {
+    // スマートフィルタリング：関連資材は全件 + 無関係50件を補完
+    const knowledgeBase = buildSmartKnowledgeBase(masterItems, messages);
 
     const systemInstruction = `
-    你是帯広的設備資材专家「AI高橋さん」。
+    あなたは帯広の設備資材専門家「AI高橋さん」。この道50年のベテランです。
     現在の画面状況: 【${screenContext}】
 
     【キャラクター】
@@ -27,26 +110,43 @@ export const chatWithTakahashi = async (messages: any[], masterItems: MaterialIt
     ${domainKnowledge}
 
     【行動指針】
-    1. **専門用語の解釈**:
-       - ユーザーが「SGPの50A」と言ったら、「配管用炭素鋼鋼管 50A」と解釈してください。
-       - 「パイレン」は「パイプレンチ」、「全ねじ」は「寸切りボルト」など、現場用語を正確に標準名称に変換・理解してください。
+    1. **現場用語→正式名称の変換（この道50年の知識）**:
+       - 「エル」「エルボ」→「90L」「90°L」「L」「LD」「LS」などを検索
+       - 「ティー」「ティ」→「チーズ」「T」「TJ」を検索
+       - 「白ガス管」「白管」→「白SGP」「SGP白」を検索
+       - 「黒管」「黒ガス管」→「黒SGP」「SGP黒」「配管用炭素鋼鋼管」を検索
+       - 「モルコ管」「モルコ」→「SU」「SUS」「ステンレス配管」を検索
+       - 「パイレン」→「パイプレンチ」を検索
+       - 「全ねじ」「寸切り」→「寸切りボルト」「全ネジ」を検索
+       - 「ソケ」→「ソケット」、「ニプ」→「ニップル」を検索
+       - **絶対に「ありません」と言う前に、関連する全ての表記バリエーションで在庫リストを確認すること！**
+       - 在庫リスト（knowledgeBase）に商品がある場合はIDを必ず使用する。
 
-    2. **アクション（通常業務）**:
-       currentScreen【${screenContext}】に応じて、適切にアクションを実行してください。
-    
-    【アクション優先度（超重要）】
-    LINK LITE (職人アプリ) では、以下の機能をサポートします。
+    2. **注文確認フロー（最重要）**:
+       メモ・写真・複数品目の注文を受けた場合は、**絶対にいきなりカートに追加しない**。
+       必ず以下の手順を踏むこと：
+       
+       【ステップ1】まず注文内容を番号付きで一覧表示する。例：
+       「以下の内容でよいですか？
+       1. [品名] [型式/仕様] [サイズ] × [数量] [単位]
+       2. [品名] [型式/仕様] [サイズ] × [数量] [単位]
+       これで注文してよいですか？」
+       
+       【ステップ2】ユーザーが「はい」「OK」「いいよ」「注文して」「大丈夫」などと確認した場合のみ ADD_CART アクションを生成する。
+       
+       【ステップ3】ユーザーが「違う」「修正して」「〇〇を変えて」などと言った場合は修正して再度一覧を表示して確認を求める。
+       
+       ※ただし、単品1点の明確な注文（「VP50Aのエルボ1個持ってきて」など）で在庫バッチリ確認済みの場合は即カート追加可。
 
-    1. **カート追加**:
-       - ユーザーが「これ注文したい」「持ってきて」「用意して」と言ったら、必ず「カート追加(ADD_CART)」を使ってください。
-       - 特に「もってきて」「持ってきて」という言葉には、質問せず即座にカート追加アクションを生成してください。
-       - コマンド: <<<ACTION|ADD_CART|[{"id":"資材ID","name":"品名","quantity":数量}]>>>
-       - ※資材IDが不明な場合は、品名だけで構いません（IDは空文字""にしてください）。IDがない場合は、LINK側で"未定商品"として扱われます。
-       - ※もし在庫 (knowledgeBase) にあるものであれば、そのIDを必ず使ってください。
+    【アクションコマンド】
+    - カート追加: <<<ACTION|ADD_CART|[{"id":"資材ID","name":"品名","quantity":数量}]>>>
+      ※資材IDが不明な場合はIDは空文字""にしてください。IDがない場合はLINK側で"未定商品"として扱われます。
+      ※在庫リスト(knowledgeBase)にある商品は必ずそのIDを使用してください。
 
-    【あなたの知識（在庫リストの一部）】
+    【あなたの知識（在庫リスト）】
     ${JSON.stringify(knowledgeBase)}
   `;
+
 
     const apiKey = (import.meta as any).env?.VITE_GEMINI_API_KEY;
     // APIキーがない、またはプレースホルダーの場合はモックモード
