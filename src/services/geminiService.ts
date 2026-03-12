@@ -73,18 +73,44 @@ const buildSmartKnowledgeBase = (masterItems: MaterialItem[], messages: any[]) =
     const userText = lastUserMsg?.parts?.[0]?.text || '';
     const searchTerms = expandSearchTerms(userText);
 
-    const matched: MaterialItem[] = [];
-    const others: MaterialItem[] = [];
+    const scored: { item: MaterialItem; score: number }[] = [];
+    const matchedCategories = new Set<string>();
 
     for (const item of masterItems) {
         const haystack = [item.name, item.model, item.dimensions, item.category, item.notes]
             .join(' ').toLowerCase();
-        const score = searchTerms.reduce((s, term) => s + (haystack.includes(term) ? 1 : 0), 0);
-        if (score > 0) matched.push(item);
-        else others.push(item);
+
+        let score = 0;
+        for (const term of searchTerms) {
+            if (haystack.includes(term)) {
+                score += term.length;
+                if (item.category) matchedCategories.add(item.category);
+            }
+        }
+
+        if (score > 0) {
+            scored.push({ item, score });
+        }
     }
 
-    const combined = [...matched, ...others.slice(0, 50)];
+    // ヒットしたカテゴリの他のアイテムも追加（漏れ対策）
+    const categoryFollowers: MaterialItem[] = [];
+    if (matchedCategories.size > 0) {
+        for (const item of masterItems) {
+            if (matchedCategories.has(item.category || '') && !scored.some(s => s.item.id === item.id)) {
+                categoryFollowers.push(item);
+            }
+        }
+    }
+
+    scored.sort((a, b) => b.score - a.score);
+
+    const combined = [
+        ...scored.map(s => s.item),
+        ...categoryFollowers.slice(0, 100),
+        ...masterItems.filter(i => !scored.some(s => s.item.id === i.id) && !categoryFollowers.some(cf => cf.id === i.id)).slice(0, 20)
+    ];
+
     return combined.map(i => ({
         id: i.id, n: i.name, m: i.model, d: i.dimensions, c: i.category
     }));
@@ -110,7 +136,12 @@ export const chatWithTakahashi = async (messages: any[], masterItems: MaterialIt
     ${domainKnowledge}
 
     【行動指針】
-    1. **現場用語→正式名称の変換（この道50年の知識）**:
+    1. **「ありません」は禁句（この道50年の意地）**:
+       - ユーザーが言う資材が、あなたの知識（knowledgeBase）に少しでも似たものがあれば、必ず「これのことかい？」と提案してください。
+       - **絶対に「ありません」と言って話を終わらせないでください。** プロとして、近い仕様のものを探し出すのがあなたの仕事です。
+       - 特に「エル」→「90L」、「ティー」→「チーズ」、「白管」→「白SGP」など、現場用語からの読み替えは瞬時に行って提案してください。
+
+    2. **現場用語→正式名称の変換**:
        - 「エル」「エルボ」→「90L」「90°L」「L」「LD」「LS」などを検索
        - 「ティー」「ティ」→「チーズ」「T」「TJ」を検索
        - 「白ガス管」「白管」→「白SGP」「SGP白」を検索
@@ -119,10 +150,9 @@ export const chatWithTakahashi = async (messages: any[], masterItems: MaterialIt
        - 「パイレン」→「パイプレンチ」を検索
        - 「全ねじ」「寸切り」→「寸切りボルト」「全ネジ」を検索
        - 「ソケ」→「ソケット」、「ニプ」→「ニップル」を検索
-       - **絶対に「ありません」と言う前に、関連する全ての表記バリエーションで在庫リストを確認すること！**
-       - 在庫リスト（knowledgeBase）に商品がある場合はIDを必ず使用する。
+       - **在庫リスト（knowledgeBase）に商品がある場合はIDを必ず使用する。**
 
-    2. **注文確認フロー（最重要）**:
+    3. **注文確認フロー（最重要）**:
        メモ・写真・複数品目の注文を受けた場合は、**絶対にいきなりカートに追加しない**。
        必ず以下の手順を踏むこと：
        
