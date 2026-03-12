@@ -73,7 +73,7 @@ export const chatWithTakahashi = async (messages: any[], masterItems: MaterialIt
 
         const ai = getAi();
         const response = await ai.models.generateContent({
-            model: 'gemini-2.0-flash-lite',
+            model: 'gemini-3-flash-preview',
             contents: contents, // Note: new SDK might expect 'contents' array directly
             config: {
                 systemInstruction: { parts: [{ text: systemInstruction }] }, // New SDK format for system instruction
