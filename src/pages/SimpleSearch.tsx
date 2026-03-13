@@ -2,6 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import type { MaterialItem } from '../types';
 import { Search, Plus, Check } from 'lucide-react';
 import { subscribeToMaterials } from '../services/OrderService';
+import { filterAndSortItems } from '../services/searchUtils';
+
 
 interface SimpleSearchProps {
     onAddToCart: (item: MaterialItem, quantity: number) => void;
@@ -22,9 +24,7 @@ export const SimpleSearch: React.FC<SimpleSearchProps> = ({ onAddToCart, cartIte
         return unsubscribe;
     }, []);
 
-    // Normalize: replace full-width spaces with half-width
-    const normalizeText = (text: string) => text.replace(/　/g, ' ').trim().toLowerCase();
-    const keywords = normalizeText(query).split(' ').filter(k => k.length > 0);
+
 
     // Build dynamic category list from actual Firestore data (preserves exact strings)
     const categories = useMemo(() => {
@@ -40,16 +40,15 @@ export const SimpleSearch: React.FC<SimpleSearchProps> = ({ onAddToCart, cartIte
         return result.sort();
     }, [items]);
 
-    const filteredItems = items.filter(item => {
-        const haystack = normalizeText(
-            [item.name, item.model, item.manufacturer ?? '', item.dimensions ?? ''].join(' ')
-        );
-        // Compare trimmed category strings directly (dynamic tab labels match Firestore exactly)
-        const matchesCategory = selectedCategory === 'all' || item.category?.trim() === selectedCategory;
-        // All keywords must match (AND search), works with both full-width and half-width spaces
-        const matchesQuery = keywords.length === 0 || keywords.every(k => haystack.includes(k));
-        return matchesQuery && matchesCategory;
-    });
+    const filteredItems = useMemo(() => {
+        const categoryFiltered = selectedCategory === 'all' 
+            ? items 
+            : items.filter(item => item.category?.trim() === selectedCategory);
+            
+        if (!query.trim()) return categoryFiltered;
+        return filterAndSortItems(categoryFiltered, query);
+    }, [items, selectedCategory, query]);
+
 
     return (
         <div className="h-full flex flex-col bg-slate-50">
