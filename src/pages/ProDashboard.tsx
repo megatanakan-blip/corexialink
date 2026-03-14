@@ -13,6 +13,7 @@ import { SiteManager } from '../components/SiteManager';
 import type { MaterialItem, SlipItem, Slip } from '../types';
 import { createEstimate, subscribeToMyOrders, subscribeToMyEstimates, subscribeToMaterials, subscribeToSiteOrders } from '../services/OrderService';
 import { subscribeToMySites } from '../services/SiteService';
+import { filterAndSortItems } from '../services/searchUtils';
 import type { Genba } from '../types';
 
 export const ProDashboard: React.FC = () => {
@@ -135,8 +136,21 @@ export const ProDashboard: React.FC = () => {
                 costPrice: 0,
                 updatedAt: Date.now()
             };
-            const existing = materials.find(m => m.id === item.id);
-            const targetItem = existing || matItem;
+            
+            // Try exact ID match first
+            let targetItem = materials.find(m => m.id === item.id);
+            
+            // If ID match fails or ID is empty, use powerful fallback search
+            if (!targetItem && item.name) {
+                const searchResults = filterAndSortItems(materials, item.name);
+                if (searchResults.length > 0) {
+                    targetItem = searchResults[0];
+                    console.log(`[AI Cart Fallback] Mapped '${item.name}' to Master Item:`, targetItem);
+                }
+            }
+            
+            // Fallback to dummy template if still not found
+            targetItem = targetItem || matItem;
 
             const itemId = targetItem.id || `temp-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
             setCart(prev => ({

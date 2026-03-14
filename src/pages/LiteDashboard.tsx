@@ -6,6 +6,7 @@ import { SimpleSearch } from './SimpleSearch';
 import type { MaterialItem, SlipItem, Slip, Genba } from '../types';
 import { createOrder, subscribeToMyOrders, subscribeToMaterials, subscribeToSiteOrders, deleteSlip } from '../services/OrderService';
 import { deleteSite, leaveSite, subscribeToMySites, updateSiteMessage } from '../services/SiteService';
+import { filterAndSortItems } from '../services/searchUtils';
 import { AITakahashi } from '../components/AITakahashi';
 import type { Message } from '../components/AITakahashi';
 import { DebugErrorBoundary } from '../components/DebugErrorBoundary';
@@ -151,7 +152,19 @@ export const LiteDashboard: React.FC = () => {
                     costPrice: 0,
                     updatedAt: Date.now()
                 };
-                const existing = materials.find(m => m.id === item.id);
+                
+                // Try exact ID match first
+                let existing = materials.find(m => m.id === item.id);
+                
+                // If ID match fails or ID is empty, use powerful fallback search
+                if (!existing && item.name) {
+                    const searchResults = filterAndSortItems(materials, item.name);
+                    if (searchResults.length > 0) {
+                        existing = searchResults[0];
+                        console.log(`[AI Cart Fallback] Mapped '${item.name}' to Master Item:`, existing);
+                    }
+                }
+                
                 handleAddToCart(existing || matItem, item.quantity);
             });
             if (!silent) alert('カートに追加しました');
