@@ -11,7 +11,7 @@ import type { Message } from '../components/AITakahashi';
 import { DebugErrorBoundary } from '../components/DebugErrorBoundary';
 import { SiteManager } from '../components/SiteManager';
 import type { MaterialItem, SlipItem, Slip } from '../types';
-import { createEstimate, subscribeToMyOrders, subscribeToMyEstimates, subscribeToMaterials, subscribeToSiteOrders } from '../services/OrderService';
+import { createEstimate, subscribeToMyOrders, subscribeToMyEstimates, subscribeToMaterials, subscribeToSiteOrders, deleteSlip } from '../services/OrderService';
 import { subscribeToMySites } from '../services/SiteService';
 import { filterAndSortItems } from '../services/searchUtils';
 import type { Genba } from '../types';
@@ -164,6 +164,22 @@ export const ProDashboard: React.FC = () => {
         if (!silent) {
             alert('見積カートに追加しました');
             setActiveTab('estimate');
+        }
+    };
+
+    const handleCancelOrder = async (orderId: string) => {
+        if (window.confirm('本当にこの注文をキャンセルしますか？\n（この操作は取り消せません）')) {
+            try {
+                // We use deleteEstimate or deleteSlip based on context if necessary, but since order modal fetches from subscribeToMyOrders, it's a slip.
+                // ProDashboard currently lacks deleteSlip from OrderService import. We need to import it.
+                // Assuming it's imported (we will add to imports)
+                await deleteSlip(orderId);
+                setSelectedSlip(null);
+                alert('注文をキャンセルしました。');
+            } catch (error) {
+                console.error("Error canceling order:", error);
+                alert('注文のキャンセルに失敗しました。時間をおいて再度お試しください。');
+            }
         }
     };
 
@@ -498,6 +514,20 @@ export const ProDashboard: React.FC = () => {
                                     <h4 className="text-[10px] font-black uppercase tracking-widest text-amber-700 mb-1">備考</h4>
                                     <p className="text-sm text-amber-900 leading-relaxed font-bold">{selectedSlip.note}</p>
                                 </div>
+                            )}
+                            
+                            {/* Cancel Order Section */}
+                            {selectedSlip.isHandled ? (
+                                <div className="mt-4 p-4 bg-slate-50 border border-slate-200 rounded-xl text-center">
+                                    <p className="text-xs font-bold text-slate-500">※キャンセルや変更の場合はお電話（0155-35-6815）でお問い合わせ下さい</p>
+                                </div>
+                            ) : (
+                                <button
+                                    onClick={() => handleCancelOrder(selectedSlip.id)}
+                                    className="mt-4 w-full py-3 bg-red-50 text-red-600 font-bold rounded-xl border border-red-200 hover:bg-red-100 transition-colors"
+                                >
+                                    この注文をキャンセルする
+                                </button>
                             )}
                         </div>
 
