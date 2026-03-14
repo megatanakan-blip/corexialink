@@ -49,6 +49,7 @@ const INDUSTRY_SYNONYMS: Record<string, string[]> = {
     // ポリ系
     'PE': ['PE', 'ポリ', 'ポリエチレン'],
     'PP': ['PP', 'ポリプロ', 'ポリプロピレン'],
+    '架橋ポリ': ['架橋ポリ', 'バクマ', 'ハードロック', '架橋ポリエチレン管', 'ポリ管'],
     // 工具系
     'パイレン': ['パイプレンチ', 'パイレン'],
     '全ねじ': ['全ねじ', '寸切り', '寸切', '全ネジ'],
@@ -139,6 +140,7 @@ export const chatWithTakahashi = async (messages: any[], masterItems: MaterialIt
        - ユーザーが言う資材が、あなたの知識（knowledgeBase）に少しでも似たものがあれば、必ず「これのことかい？」と提案してください。
        - **絶対に「ありません」と言って話を終わらせないでください。** プロとして、近い仕様のものを探し出すのがあなたの仕事です。
        - 特に「エル」→「90L」、「ティー」→「チーズ」、「白管」→「白SGP」など、現場用語からの読み替えは瞬時に行って提案してください。
+       - 「架橋ポリ」と言われたら必ず「バクマ」「ハードロック」の系統を提案してください。
 
     2. **現場用語→正式名称の変換**:
        - 「エル」「エルボ」→「90L」「90°L」「L」「LD」「LS」などを検索
@@ -167,8 +169,8 @@ export const chatWithTakahashi = async (messages: any[], masterItems: MaterialIt
        ※ただし、単品1点の明確な注文（「VP50Aのエルボ1個持ってきて」など）でマスターにバッチリ確認済みの場合は即カート追加可。
 
     【アクションコマンド】
-    - カート追加: <<<ACTION|ADD_CART|[{"id":"資材ID","name":"品名","quantity":数量}]>>>
-      ※資材IDが不明な場合はIDは空文字""にしてください。IDがない場合はLINK側で"未定商品"として扱われます。
+    - カート追加: <<<ACTION|ADD_CART|[{"id":"必ずknowledgeBaseのidを入れる。不明な場合は空文字にする","name":"品名（実際のknowledgeBaseのnameと同じにする）","quantity":数量,"model":"knowledgeBaseのmodelと同じ、または推測した型式","dimensions":"knowledgeBaseのdimensionsと同じ、または推測した寸法"}]>>>
+      ※資材IDが不明な場合やマスターにない完全な新規商品の場合は「id」を空文字""にしてください。IDがない場合でも必ず「name」「model」「dimensions」は分けて出力してください。全てを「name」に繋げて出力してはいけません。
       ※取扱商品マスターリスト(knowledgeBase)にある商品は必ずそのIDを使用してください。
 
     【あなたの知識（取扱商品マスターリスト）】

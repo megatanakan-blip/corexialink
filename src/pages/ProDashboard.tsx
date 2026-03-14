@@ -128,7 +128,7 @@ export const ProDashboard: React.FC = () => {
                 quantity: 0,
                 category: 'AI追加',
                 model: item.model || '',
-                dimensions: '',
+                dimensions: item.dimensions || '',
                 unit: '個',
                 location: '',
                 listPrice: 0,
