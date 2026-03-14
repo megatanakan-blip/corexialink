@@ -1,4 +1,4 @@
-import { MaterialItem } from '../types';
+import type { MaterialItem } from '../types';
 
 /**
  * Normalizes text for search by:
@@ -58,6 +58,10 @@ export const normalizeForSearch = (text: string): string => {
     return normalized;
 };
 
+export const escapeRegExp = (text: string): string => {
+    return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+};
+
 export const calculateRelevanceScore = (item: MaterialItem, keywords: string[]): number => {
     if (keywords.length === 0) return 0;
 
@@ -73,14 +77,28 @@ export const calculateRelevanceScore = (item: MaterialItem, keywords: string[]):
     };
 
     // 1. AND filter logic (MUST match all keywords somewhere)
-    const matchesAll = keywords.every(k => 
-        fields.name.includes(k) || 
-        fields.model.includes(k) || 
-        fields.dimensions.includes(k) || 
-        fields.manufacturer.includes(k) || 
-        fields.category.includes(k) ||
-        fields.location.includes(k)
-    );
+    const matchesAll = keywords.every(k => {
+        // If keyword is strictly alphabetic, require Word Boundary (must not be part of a larger word like 'AS' for 'S')
+        // If keyword is strictly numeric, require at least non-numeric prefix/suffix so '20' doesn't match '120'
+        
+        let regexSource = escapeRegExp(k);
+        if (/^[a-z]+$/.test(k)) {
+             regexSource = `(^|[^a-z])${regexSource}($|[^a-z])`;
+        } else if (/^[0-9]+$/.test(k)) {
+             regexSource = `(^|[^0-9])${regexSource}($|[^0-9])`;
+        }
+        
+        const strictRegex = new RegExp(regexSource, 'i');
+        
+        return (
+            strictRegex.test(fields.name) || 
+            strictRegex.test(fields.model) || 
+            strictRegex.test(fields.dimensions) || 
+            strictRegex.test(fields.manufacturer) || 
+            strictRegex.test(fields.category) ||
+            strictRegex.test(fields.location)
+        );
+    });
 
     if (!matchesAll) return -1;
 
@@ -93,14 +111,25 @@ export const calculateRelevanceScore = (item: MaterialItem, keywords: string[]):
     keywords.forEach((k, idx) => {
         // Higher weight for the first keyword
         const multiplier = idx === 0 ? 2 : 1;
+        const escapedK = escapeRegExp(k);
 
         // 3. Exact matches (Absolute priority)
         if (fields.model === k) totalScore += 5000 * multiplier;
         if (fields.dimensions === k) totalScore += 4000 * multiplier;
         if (fields.name === k) totalScore += 3000 * multiplier;
 
-        // 4. Boundary matches (e.g., "S" matches "モルコ S" as a word)
-        const boundaryRegex = new RegExp(`(^|\\s|[-/])${k}($|\\s|[-/])`, 'i');
+        // 4. Boundary matches
+        // For alphabets, ensure not joined with other alphabets. For numbers, ensure not joined with other numbers.
+        let bRegexSource = escapedK;
+        if (/^[a-z]+$/.test(k)) {
+             bRegexSource = `(^|[^a-z])${escapedK}($|[^a-z])`;
+        } else if (/^[0-9]+$/.test(k)) {
+             bRegexSource = `(^|[^0-9])${escapedK}($|[^0-9])`;
+        } else {
+             bRegexSource = `(^|[\\s\\-/$])${escapedK}($|[\\s\\-/$])`;
+        }
+
+        const boundaryRegex = new RegExp(bRegexSource, 'i');
         if (boundaryRegex.test(fields.model)) totalScore += 1000 * multiplier;
         if (boundaryRegex.test(fields.dimensions)) totalScore += 800 * multiplier;
         if (boundaryRegex.test(fields.name)) totalScore += 600 * multiplier;
