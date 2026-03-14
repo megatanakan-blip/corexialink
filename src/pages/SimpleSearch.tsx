@@ -1,16 +1,17 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import type { MaterialItem } from '../types';
-import { Search, Plus, Check } from 'lucide-react';
+import { Search, Plus } from 'lucide-react';
 import { subscribeToMaterials } from '../services/OrderService';
 import { filterAndSortItems } from '../services/searchUtils';
 
 
 interface SimpleSearchProps {
     onAddToCart: (item: MaterialItem, quantity: number) => void;
+    onUpdateQuantity: (id: string, quantity: number) => void;
     cartItems: { [id: string]: number };
 }
 
-export const SimpleSearch: React.FC<SimpleSearchProps> = ({ onAddToCart, cartItems }) => {
+export const SimpleSearch: React.FC<SimpleSearchProps> = ({ onAddToCart, onUpdateQuantity, cartItems }) => {
     const [items, setItems] = useState<MaterialItem[]>([]);
     const [query, setQuery] = useState('');
     const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -102,14 +103,21 @@ export const SimpleSearch: React.FC<SimpleSearchProps> = ({ onAddToCart, cartIte
 
                             <div className="flex items-center gap-3">
                                 {cartItems[item.id] ? (
-                                    <div className="bg-green-50 text-brand-green font-bold px-3 py-2 rounded-lg text-sm flex items-center gap-1 border border-brand-green/20">
-                                        <Check size={16} />
-                                        {cartItems[item.id]}
+                                    <div className="flex items-center gap-2 bg-slate-50 border border-brand-green/30 rounded-lg p-1">
+                                        <button 
+                                            onClick={() => onUpdateQuantity(item.id, cartItems[item.id] - 1)}
+                                            className="w-8 h-8 flex items-center justify-center text-brand-green bg-white rounded shadow-sm hover:bg-green-50 active:scale-95 transition-all text-lg font-black"
+                                        >-</button>
+                                        <span className="w-6 text-center font-black text-slate-800 text-sm">{cartItems[item.id]}</span>
+                                        <button 
+                                            onClick={() => onUpdateQuantity(item.id, cartItems[item.id] + 1)}
+                                            className="w-8 h-8 flex items-center justify-center text-brand-green bg-white rounded shadow-sm hover:bg-green-50 active:scale-95 transition-all text-lg font-black"
+                                        >+</button>
                                     </div>
                                 ) : (
                                     <button
                                         onClick={() => onAddToCart(item, 1)}
-                                        className="bg-slate-900 text-white p-3 rounded-xl shadow-lg shadow-slate-900/20 active:scale-95 transition-all"
+                                        className="bg-slate-900 text-white p-3 rounded-xl shadow-lg shadow-slate-900/20 active:scale-95 transition-all outline-none"
                                     >
                                         <Plus size={20} />
                                     </button>

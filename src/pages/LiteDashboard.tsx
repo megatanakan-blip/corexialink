@@ -135,6 +135,18 @@ export const LiteDashboard: React.FC = () => {
         }
     }, []);
 
+    const handleUpdateCartQuantity = useCallback((id: string, newQuantity: number) => {
+        setCart(prev => {
+            const next = { ...prev };
+            if (newQuantity <= 0) {
+                delete next[id];
+            } else if (next[id]) {
+                next[id] = { ...next[id], quantity: newQuantity };
+            }
+            return next;
+        });
+    }, []);
+
     const handleAIAddToCart = useCallback((items: any[], silent: boolean = false) => {
         try {
             items.forEach(item => {
@@ -519,6 +531,7 @@ export const LiteDashboard: React.FC = () => {
                     <div className="h-[calc(100vh-80px)]">
                         <SimpleSearch
                             onAddToCart={handleAddToCart}
+                            onUpdateQuantity={handleUpdateCartQuantity}
                             cartItems={Object.fromEntries(Object.values(cart).map(c => [c.item.id, c.quantity]))}
                         />
                     </div>

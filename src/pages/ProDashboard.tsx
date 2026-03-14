@@ -81,6 +81,18 @@ export const ProDashboard: React.FC = () => {
         alert(`${item.name} をリストに追加しました`);
     };
 
+    const handleUpdateCartQuantity = (id: string, newQuantity: number) => {
+        setCart(prev => {
+            const next = { ...prev };
+            if (newQuantity <= 0) {
+                delete next[id];
+            } else if (next[id]) {
+                next[id] = { ...next[id], quantity: newQuantity };
+            }
+            return next;
+        });
+    };
+
     const handleTabChange = (tab: typeof activeTab) => {
         if ((tab === 'search' || tab === 'estimate' || tab === 'chat') && !currentSiteId) {
             alert('資材を検索したり見積を作成したりする前に、現場を選択してください。');
@@ -315,6 +327,7 @@ export const ProDashboard: React.FC = () => {
                         <div className="flex-1 overflow-hidden relative">
                             <SimpleSearch
                                 onAddToCart={handleAddToCart}
+                                onUpdateQuantity={handleUpdateCartQuantity}
                                 cartItems={Object.fromEntries(Object.values(cart).map(c => [c.item.id, c.quantity]))}
                             />
                         </div>
