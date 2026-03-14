@@ -88,7 +88,9 @@ export const subscribeToMyOrders = (uid: string, cb: (s: Slip[]) => void): Unsub
     );
 
     return onSnapshot(q, (snapshot) => {
-        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Slip));
+        const data = snapshot.docs
+            .map(doc => ({ id: doc.id, ...doc.data() } as Slip))
+            .filter(slip => slip.type === 'outbound');
         // Client-side sort
         data.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
         cb(data);
@@ -102,7 +104,9 @@ export const subscribeToSiteOrders = (siteId: string, cb: (s: Slip[]) => void): 
     );
 
     return onSnapshot(q, (snapshot) => {
-        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Slip));
+        const data = snapshot.docs
+            .map(doc => ({ id: doc.id, ...doc.data() } as Slip))
+            .filter(slip => slip.type === 'outbound');
         // Client-side sort
         data.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
         cb(data);
