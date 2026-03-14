@@ -60,6 +60,7 @@ export const LiteDashboard: React.FC = () => {
     const [submitting, setSubmitting] = useState(false);
     const [materials, setMaterials] = useState<MaterialItem[]>([]);
     const [selectedSlip, setSelectedSlip] = useState<Slip | null>(null);
+    const [showCancelConfirm, setShowCancelConfirm] = useState(false);
     const [sites, setSites] = useState<Genba[]>([]);
     const [isEditingMessage, setIsEditingMessage] = useState(false);
     const [editingMessageText, setEditingMessageText] = useState('');
@@ -193,24 +194,27 @@ export const LiteDashboard: React.FC = () => {
                 // Only trigger re-render if the status fundamentally changed
                 if (updatedSlip.isHandled !== selectedSlip.isHandled) {
                     setSelectedSlip(updatedSlip);
+                    if (updatedSlip.isHandled) setShowCancelConfirm(false);
                 }
             } else {
                 // Slip was deleted from the database
                 setSelectedSlip(null);
+                setShowCancelConfirm(false);
             }
+        } else {
+            setShowCancelConfirm(false);
         }
     }, [orderHistory, selectedSlip]);
 
     const handleCancelOrder = async (orderId: string) => {
-        if (window.confirm('本当にこの注文をキャンセルしますか？\n（この操作は取り消せません）')) {
-            try {
-                await deleteSlip(orderId);
-                setSelectedSlip(null);
-                alert('注文をキャンセルしました。');
-            } catch (error) {
-                console.error("Error canceling order:", error);
-                alert('注文のキャンセルに失敗しました。時間をおいて再度お試しください。');
-            }
+        try {
+            await deleteSlip(orderId);
+            setSelectedSlip(null);
+            setShowCancelConfirm(false);
+            alert('注文をキャンセルしました。');
+        } catch (error) {
+            console.error("Error canceling order:", error);
+            alert('注文のキャンセルに失敗しました。時間をおいて再度お試しください。');
         }
     };
 
@@ -876,9 +880,28 @@ export const LiteDashboard: React.FC = () => {
                                 <div className="mt-4 p-4 bg-slate-50 border border-slate-200 rounded-xl text-center">
                                     <p className="text-xs font-bold text-slate-500">※キャンセルや変更の場合はお電話（0155-35-6815）でお問い合わせ下さい</p>
                                 </div>
+                            ) : showCancelConfirm ? (
+                                <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-xl text-center shadow-inner">
+                                    <p className="text-sm font-bold text-red-600 mb-3">本当にこの注文をキャンセルしますか？</p>
+                                    <p className="text-[10px] text-red-500 mb-4 tracking-tight">※この操作は取り消せません。既に職人が手配を進めている場合があるためご注意ください。</p>
+                                    <div className="flex items-center gap-3">
+                                        <button
+                                            onClick={() => setShowCancelConfirm(false)}
+                                            className="flex-1 py-3 bg-white text-slate-600 font-bold rounded-xl border border-slate-200 hover:bg-slate-50 transition-colors text-sm"
+                                        >
+                                            やめる
+                                        </button>
+                                        <button
+                                            onClick={() => handleCancelOrder(selectedSlip.id)}
+                                            className="flex-1 py-3 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 shadow-lg shadow-red-600/20 active:scale-95 transition-all text-sm"
+                                        >
+                                            キャンセル確定
+                                        </button>
+                                    </div>
+                                </div>
                             ) : (
                                 <button
-                                    onClick={() => handleCancelOrder(selectedSlip.id)}
+                                    onClick={() => setShowCancelConfirm(true)}
                                     className="mt-4 w-full py-3 bg-red-50 text-red-600 font-bold rounded-xl border border-red-200 hover:bg-red-100 transition-colors"
                                 >
                                     この注文をキャンセルする
