@@ -179,6 +179,22 @@ export const ProDashboard: React.FC = () => {
         }
     };
 
+    // Sync selected slip with real-time updates from orderHistory
+    useEffect(() => {
+        if (selectedSlip) {
+            const updatedSlip = orderHistory.find(s => s.id === selectedSlip.id);
+            if (updatedSlip) {
+                // Only trigger re-render if the status fundamentally changed
+                if (updatedSlip.isHandled !== selectedSlip.isHandled) {
+                    setSelectedSlip(updatedSlip);
+                }
+            } else {
+                // Slip was deleted from the database
+                setSelectedSlip(null);
+            }
+        }
+    }, [orderHistory, selectedSlip]);
+
     const handleCancelOrder = async (orderId: string) => {
         if (window.confirm('本当にこの注文をキャンセルしますか？\n（この操作は取り消せません）')) {
             try {
