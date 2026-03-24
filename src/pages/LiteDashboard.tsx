@@ -191,10 +191,13 @@ export const LiteDashboard: React.FC = () => {
         if (selectedSlip) {
             const updatedSlip = orderHistory.find(s => s.id === selectedSlip.id);
             if (updatedSlip) {
-                // Only trigger re-render if the status fundamentally changed
-                if (updatedSlip.isHandled !== selectedSlip.isHandled) {
+                // Check if status fundamentally changed (handled or closed)
+                const wasHandled = !!selectedSlip.isHandled || !!selectedSlip.isClosed;
+                const isHandled = !!updatedSlip.isHandled || !!updatedSlip.isClosed;
+                
+                if (isHandled !== wasHandled) {
                     setSelectedSlip(updatedSlip);
-                    if (updatedSlip.isHandled) setShowCancelConfirm(false);
+                    if (isHandled) setShowCancelConfirm(false);
                 }
             } else {
                 // Slip was deleted from the database
@@ -530,7 +533,7 @@ export const LiteDashboard: React.FC = () => {
                                                 )}
                                             </div>
                                             <div className="flex items-center gap-2">
-                                                {slip.isHandled ? (
+                                                {(slip.isHandled || slip.isClosed) ? (
                                                     <span className="bg-blue-100 text-blue-700 text-xs font-bold px-2 py-1 rounded">手配済</span>
                                                 ) : (
                                                     <span className="bg-orange-100 text-orange-700 text-xs font-bold px-2 py-1 rounded">手配待</span>
@@ -843,7 +846,7 @@ export const LiteDashboard: React.FC = () => {
                         <div className="flex-1 overflow-y-auto p-6 space-y-4">
                             <div className="flex items-center justify-between bg-slate-50 p-4 rounded-2xl">
                                 <div className="text-sm font-bold text-slate-600">ステータス</div>
-                                {selectedSlip.isHandled ? (
+                                {(selectedSlip.isHandled || selectedSlip.isClosed) ? (
                                     <span className="bg-blue-600 text-white text-xs font-black px-3 py-1 rounded-full shadow-lg shadow-blue-600/20">手配完了</span>
                                 ) : (
                                     <span className="bg-orange-500 text-white text-xs font-black px-3 py-1 rounded-full shadow-lg shadow-orange-500/20">手配中</span>
@@ -876,9 +879,9 @@ export const LiteDashboard: React.FC = () => {
                             )}
                             
                             {/* Cancel Order Section */}
-                            {selectedSlip.isHandled ? (
+                            {(selectedSlip.isHandled || selectedSlip.isClosed) ? (
                                 <div className="mt-4 p-4 bg-slate-50 border border-slate-200 rounded-xl text-center">
-                                    <p className="text-xs font-bold text-slate-500">※キャンセルや変更の場合はお電話（0155-35-6815）でお問い合わせ下さい</p>
+                                    <p className="text-xs font-bold text-slate-500">※手配済みのためキャンセルや変更の場合はお電話（0155-35-6815）でお問い合わせ下さい</p>
                                 </div>
                             ) : showCancelConfirm ? (
                                 <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-xl text-center shadow-inner">

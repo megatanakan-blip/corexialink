@@ -185,10 +185,13 @@ export const ProDashboard: React.FC = () => {
         if (selectedSlip) {
             const updatedSlip = orderHistory.find(s => s.id === selectedSlip.id);
             if (updatedSlip) {
-                // Only trigger re-render if the status fundamentally changed
-                if (updatedSlip.isHandled !== selectedSlip.isHandled) {
+                // Check if status fundamentally changed (handled or closed)
+                const wasHandled = !!selectedSlip.isHandled || !!selectedSlip.isClosed;
+                const isHandled = !!updatedSlip.isHandled || !!updatedSlip.isClosed;
+
+                if (isHandled !== wasHandled) {
                     setSelectedSlip(updatedSlip);
-                    if (updatedSlip.isHandled) setShowCancelConfirm(false);
+                    if (isHandled) setShowCancelConfirm(false);
                 }
             } else {
                 // Slip was deleted from the database
@@ -328,7 +331,7 @@ export const ProDashboard: React.FC = () => {
                                         )}
                                     </div>
                                     <span className="bg-slate-100 text-slate-600 px-2 py-1 rounded text-xs font-bold">
-                                        {order.isHandled ? '手配済' : '処理中'}
+                                        {(order.isHandled || order.isClosed) ? '手配済' : '処理中'}
                                     </span>
                                 </div>
                             ))}
@@ -459,8 +462,8 @@ export const ProDashboard: React.FC = () => {
                                             )}
                                         </div>
                                         <div className="text-right flex flex-col items-end gap-2">
-                                            <span className={`text-[10px] px-2 py-1 rounded font-black ${order.isHandled ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'}`}>
-                                                {order.isHandled ? '手配済' : '手配中'}
+                                            <span className={`text-[10px] px-2 py-1 rounded font-black ${(order.isHandled || order.isClosed) ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'}`}>
+                                                {(order.isHandled || order.isClosed) ? '手配済' : '手配中'}
                                             </span>
                                             <div className="text-[10px] text-slate-300 font-mono">ID: {order.id.slice(-6).toUpperCase()}</div>
                                         </div>
@@ -514,7 +517,7 @@ export const ProDashboard: React.FC = () => {
                         <div className="flex-1 overflow-y-auto p-6 space-y-4">
                             <div className="flex items-center justify-between bg-slate-50 p-4 rounded-2xl">
                                 <div className="text-sm font-bold text-slate-600">ステータス</div>
-                                {selectedSlip.isHandled ? (
+                                {(selectedSlip.isHandled || selectedSlip.isClosed) ? (
                                     <span className="bg-blue-600 text-white text-xs font-black px-3 py-1 rounded-full">手配完了</span>
                                 ) : (
                                     <span className="bg-orange-500 text-white text-xs font-black px-3 py-1 rounded-full">手配中</span>
@@ -547,9 +550,9 @@ export const ProDashboard: React.FC = () => {
                             )}
                             
                             {/* Cancel Order Section */}
-                            {selectedSlip.isHandled ? (
+                            {(selectedSlip.isHandled || selectedSlip.isClosed) ? (
                                 <div className="mt-4 p-4 bg-slate-50 border border-slate-200 rounded-xl text-center">
-                                    <p className="text-xs font-bold text-slate-500">※キャンセルや変更の場合はお電話（0155-35-6815）でお問い合わせ下さい</p>
+                                    <p className="text-xs font-bold text-slate-500">※手配済みのためキャンセルや変更の場合はお電話（0155-35-6815）でお問い合わせ下さい</p>
                                 </div>
                             ) : showCancelConfirm ? (
                                 <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-xl text-center shadow-inner">
