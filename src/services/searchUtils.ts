@@ -56,9 +56,34 @@ export const INDUSTRY_SYNONYMS: Record<string, string[]> = {
     '圧力配管用炭素鋼鋼管': ['STPG', 'スケ番', 'Sch'],
     '一般配管用ステンレス鋼管': ['SU', 'SUS', 'モルコ', 'ステンレス'],
     '配管用ステンレス鋼管': ['SUS', 'ステンレス'],
-    '硬質ポリ塩化ビニル管': ['VP', 'VU', '塩ビ'],
-    '水道用硬質塩化ビニルライニング鋼管': ['SGP-VA', 'SGP-VB', 'SGP-VD', 'ライニング管'],
-    '水配管用亜鉛めっき鋼管': ['SGPW', '白管'],
+    '硬質ポリ塩化ビニル管': ['VP', 'VU', '塩ビ', 'PVC'],
+    '水道用硬質塩化ビニルライニング鋼管': ['SGP-VA', 'SGP-VB', 'SGP-VD', 'ライニング管', 'VA', 'VB', 'VD', 'V-LP'],
+    '水配管用亜鉛めっき鋼管': ['SGPW', '白管', 'W', 'SGP-W'],
+    // 継手種類
+    '径違い': ['異径', 'レジューサー', 'RD', 'RC', '異径継手'],
+    '異径': ['径違い', 'レジューサー', 'RD', 'RC', '異径継手'],
+    'めねじ': ['メス', '内ねじ', 'ねじ込'],
+    'おねじ': ['オス', '外ねじ', 'ねじ込'],
+    // サイズ対応（インチ呼び ↔ A呼び）
+    '1/2': ['15A', '15', '4分'],
+    '3/4': ['20A', '20', '6分'],
+    '1': ['25A', '25', '1インチ'],
+    '1-1/4': ['32A', '32', '1-1/4', '1インチ1/4', 'インチ2'],
+    '1-1/2': ['40A', '40', '1-1/2', '1インチ1/2', 'インチ4'],
+    '2': ['50A', '50', '2インチ'],
+    '2-1/2': ['65A', '65'],
+    '3': ['80A', '80'],
+    '4': ['100A', '100'],
+    // 逆引き
+    '15A': ['1/2', '15', '4分'],
+    '20A': ['3/4', '20', '6分'],
+    '25A': ['1', '25', '1インチ'],
+    '32A': ['1-1/4', '32', 'インチ2'],
+    '40A': ['1-1/2', '40', 'インチ4'],
+    '50A': ['2', '50', '2インチ'],
+    '65A': ['2-1/2', '65'],
+    '80A': ['3', '80'],
+    '100A': ['4', '100'],
 };
 
 /**
@@ -188,8 +213,20 @@ export const calculateRelevanceScore = (item: MaterialItem, keywords: string[]):
     // 2. Full query match boost (across name, model, dimensions)
     const combinedKeyFields = `${fields.name} ${fields.model} ${fields.dimensions}`.trim();
     const fullQuery = keywords.join(' ');
-    if (combinedKeyFields === fullQuery) totalScore += 10000;
-    else if (combinedKeyFields.startsWith(fullQuery)) totalScore += 5000;
+    
+    // Exact match (ignoring whitespace)
+    const strippedKey = combinedKeyFields.replace(/\s+/g, '');
+    const strippedQuery = fullQuery.replace(/\s+/g, '');
+    if (strippedKey === strippedQuery) totalScore += 15000;
+    else if (combinedKeyFields === fullQuery) totalScore += 10000;
+    
+    // Bag-of-words exact match (handles order like "白SGP" vs "SGP白")
+    const masterWords = fields.name.split(/\s+/).filter(w => w.length > 0);
+    if (masterWords.length > 0 && masterWords.length === keywords.length && masterWords.every(w => keywords.includes(w))) {
+        totalScore += 12000;
+    }
+    
+    if (combinedKeyFields.startsWith(fullQuery)) totalScore += 5000;
 
     keywords.forEach((k, idx) => {
         // Higher weight for the first keyword

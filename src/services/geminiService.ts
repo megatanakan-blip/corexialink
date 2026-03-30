@@ -1,28 +1,17 @@
 import { GoogleGenAI } from "@google/genai";
 import type { MaterialItem } from "../types";
 import { domainKnowledge } from './domainKnowledge';
-import { INDUSTRY_SYNONYMS } from './searchUtils';
+import { expandSearchTerms } from './searchUtils';
 
 // APIキーは環境変数から取得
 const getAi = () => new GoogleGenAI({ apiKey: (import.meta as any).env?.VITE_GEMINI_API_KEY || "" });
 
-const expandSearchTerms = (text: string): string[] => {
-    const lower = text.toLowerCase();
-    const terms = new Set<string>([lower]);
-    for (const [key, synonyms] of Object.entries(INDUSTRY_SYNONYMS)) {
-        const allVariants = [key.toLowerCase(), ...synonyms.map(s => s.toLowerCase())];
-        if (allVariants.some(v => lower.includes(v))) {
-            synonyms.forEach(s => terms.add(s.toLowerCase()));
-            terms.add(key.toLowerCase());
-        }
-    }
-    return Array.from(terms);
-};
-
 const buildSmartKnowledgeBase = (masterItems: MaterialItem[], messages: any[]) => {
     const lastUserMsg = [...messages].reverse().find((m: any) => m.role === 'user');
     const userText = lastUserMsg?.parts?.[0]?.text || '';
-    const searchTerms = expandSearchTerms(userText);
+    // Split user input into words for better expansion
+    const userWords = userText.trim().split(/\s+/);
+    const searchTerms = expandSearchTerms(userWords);
 
     const scored: { item: MaterialItem; score: number }[] = [];
     const matchedCategories = new Set<string>();
@@ -107,7 +96,12 @@ export const chatWithTakahashi = async (messages: any[], masterItems: MaterialIt
        - ユーザーが「国土交通省仕様」や「規格名称」で依頼してきた場合でも、**そのままの名称で伝票を起こさないでください**。
        - 必ず提供された `knowledgeBase` の中から、**最も仕様が近い商品（近似値）を探し出し、その商品のIDを使用してください**。
        - カート追加（ADD_CART）の際は、選んだ商品の `id`, `name`, `model`, `dimensions` を `knowledgeBase` のデータと完全に一致させて出力してください。
-       - 例：ユーザーが「配管用炭素鋼鋼管 50A」と言った場合、`knowledgeBase` に「SGP 50A 白」があれば、それを使ってください。
+       - 【マッピングのコツ】
+         - 「50A」「50」「2インチ」「2"」などの寸法表記のブレは同一視してください。
+         - 「白管」「SGP白」「白ガス管」「亜鉛メッキ」などは同一視してください。
+         - 「黒管」「SGP黒」「黒ガス管」などは同一視してください。
+         - 「エルボ」「エル」、「ティー」「チーズ」「ティ」などの名称のブレは同一視してください。
+       - 例：ユーザーが「配管用炭素鋼鋼管 50A」と言った場合、`knowledgeBase` に「白SGP 50A」があれば、それを使ってください。
        - 「あ、高橋です。国交省仕様の〇〇ですね。うちのマスターではこの『△△』がぴったりですので、これを入れておきますね」といった具合に、プロの判断でマスター品に変換したことを伝えてください。
 
     4. **注文確認フロー（最重要）**:
