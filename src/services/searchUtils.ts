@@ -1,6 +1,87 @@
 import type { MaterialItem } from '../types';
 
 /**
+ * Industry synonyms dictionary for mapping field terms to master keywords.
+ */
+export const INDUSTRY_SYNONYMS: Record<string, string[]> = {
+    // エルボ・曲管系
+    'エルボ': ['エルボ', 'エル', 'elbow', 'el', '90l', '90°l', '45l', '45°l', 'LD', 'LS', 'LL', '曲管', 'エルボー'],
+    'エル': ['エルボ', 'エル', '90L', '90°L', 'L', 'LL', 'LS', 'LD', 'エルボー', '曲管'],
+    // チーズ・三叉管系
+    'チーズ': ['チーズ', 'ティー', 'tee', 'tj', 'ts', 'tl', 'T管', '三叉', '分岐'],
+    'ティー': ['チーズ', 'T', 'TJ', 'TS', 'TL', 'ティ', '三叉', '分岐'],
+    'ティ': ['チーズ', 'T', 'TJ', 'TS', '三叉'],
+    // ソケット系
+    'ソケット': ['ソケット', 'socket', 'sk', 'S', '継手'],
+    // ニップル系
+    'ニップル': ['ニップル', 'nipple', 'np', 'NI'],
+    // ユニオン系
+    'ユニオン': ['ユニオン', 'union', 'un'],
+    // フランジ系
+    'フランジ': ['フランジ', 'flange', 'fl', 'FF', 'RF'],
+    // バルブ系
+    'バルブ': ['バルブ', 'valve', 'VLV', 'V'],
+    'ゲートバルブ': ['ゲートバルブ', 'gate', 'GV', 'ゲート'],
+    'ボールバルブ': ['ボールバルブ', 'ball', 'BV', 'ボール'],
+    'グローブバルブ': ['グローブバルブ', 'globe', 'GLV', 'グローブ'],
+    'チェックバルブ': ['チェックバルブ', 'check', 'CV', 'チェック', '逆止'],
+    // キャップ・プラグ
+    'キャップ': ['キャップ', 'cap', 'CP', '盲'],
+    'プラグ': ['プラグ', 'plug', 'PL'],
+    // レジューサー・異径系
+    'レジューサー': ['レジューサー', 'reducer', 'RD', 'レデューサ', '異径'],
+    // 鋼管系（白ガス・黒管・白管）
+    '黒管': ['黒管', '黒SGP', 'SGP黒', '配管用炭素鋼鋼管', 'SGP', 'ガス管', 'GP'],
+    '白管': ['白管', '白SGP', 'SGP白', '白ガス管'],
+    '白ガス管': ['白SGP', 'SGP白', '白管', 'ガス管', 'SGP'],
+    'SGP': ['SGP', '黒管', '白管', '配管用炭素鋼鋼管', 'ガス管'],
+    // ステンレス系（モルコ管など）
+    'モルコ管': ['SU', 'SUS', 'ステンレス', 'モルコ', 'SA', 'SUS配管'],
+    'モルコ': ['SU', 'SUS', 'ステンレス', 'モルコ管'],
+    'SUS': ['SUS', 'SU', 'ステンレス', 'stainless', 'SA', 'モルコ管'],
+    // 塩ビ系
+    'VP': ['VP', '塩ビ', '塩化ビニル', 'PVC', '硬質ポリ塩化ビニル管'],
+    'VU': ['VU', '薄肉塩ビ', '排水用', '硬質ポリ塩化ビニル管'],
+    'HI': ['HI', '耐衝撃', '強化塩ビ'],
+    // ポリ系
+    'PE': ['PE', 'ポリ', 'ポリエチレン'],
+    'PP': ['PP', 'ポリプロ', 'ポリプロピレン'],
+    '架橋ポリ': ['架橋ポリ', 'バクマ', 'ハードロック', '架橋ポリエチレン管', 'ポリ管'],
+    // 工具系
+    'パイレン': ['パイプレンチ', 'パイレン'],
+    '全ねじ': ['全ねじ', '寸切り', '寸切', '全ネジ'],
+    'バンド': ['バンド', 'ハンガー', '吊り', '吊バンド', '吊りバンド'],
+    // 国土交通省仕様・JIS規格名
+    '配管用炭素鋼鋼管': ['SGP', '黒管', '白管', 'ガス管', 'GP'],
+    '圧力配管用炭素鋼鋼管': ['STPG', 'スケ番', 'Sch'],
+    '一般配管用ステンレス鋼管': ['SU', 'SUS', 'モルコ', 'ステンレス'],
+    '配管用ステンレス鋼管': ['SUS', 'ステンレス'],
+    '硬質ポリ塩化ビニル管': ['VP', 'VU', '塩ビ'],
+    '水道用硬質塩化ビニルライニング鋼管': ['SGP-VA', 'SGP-VB', 'SGP-VD', 'ライニング管'],
+    '水配管用亜鉛めっき鋼管': ['SGPW', '白管'],
+};
+
+/**
+ * Expands search terms with synonyms.
+ */
+export const expandSearchTerms = (keywords: string[]): string[] => {
+    const expanded = new Set<string>();
+    keywords.forEach(k => {
+        expanded.add(k);
+        const lowerK = k.toLowerCase();
+        
+        for (const [key, synonyms] of Object.entries(INDUSTRY_SYNONYMS)) {
+            const allVariants = [key.toLowerCase(), ...synonyms.map(s => s.toLowerCase())];
+            if (allVariants.some(v => lowerK.includes(v) || v.includes(lowerK))) {
+                synonyms.forEach(s => expanded.add(s.toLowerCase()));
+                expanded.add(key.toLowerCase());
+            }
+        }
+    });
+    return Array.from(expanded);
+};
+
+/**
  * Normalizes text for search by:
  * 1. Converting Hiragana to Katakana
  * 2. Converting Full-width alphanumeric characters to Half-width
@@ -77,27 +158,29 @@ export const calculateRelevanceScore = (item: MaterialItem, keywords: string[]):
     };
 
     // 1. AND filter logic (MUST match all keywords somewhere)
+    // For each keyword, check if it or any of its synonyms matches.
     const matchesAll = keywords.every(k => {
-        // If keyword is strictly alphabetic, require Word Boundary (must not be part of a larger word like 'AS' for 'S')
-        // If keyword is strictly numeric, require at least non-numeric prefix/suffix so '20' doesn't match '120'
+        const kExpanded = expandSearchTerms([k]);
         
-        let regexSource = escapeRegExp(k);
-        if (/^[a-z]+$/.test(k)) {
-             regexSource = `(^|[^a-z])${regexSource}($|[^a-z])`;
-        } else if (/^[0-9]+$/.test(k)) {
-             regexSource = `(^|[^0-9])${regexSource}($|[^0-9])`;
-        }
-        
-        const strictRegex = new RegExp(regexSource, 'i');
-        
-        return (
-            strictRegex.test(fields.name) || 
-            strictRegex.test(fields.model) || 
-            strictRegex.test(fields.dimensions) || 
-            strictRegex.test(fields.manufacturer) || 
-            strictRegex.test(fields.category) ||
-            strictRegex.test(fields.location)
-        );
+        return kExpanded.some(term => {
+            let regexSource = escapeRegExp(term);
+            if (/^[a-z]+$/.test(term)) {
+                 regexSource = `(^|[^a-z])${regexSource}($|[^a-z])`;
+            } else if (/^[0-9]+$/.test(term)) {
+                 regexSource = `(^|[^0-9])${regexSource}($|[^0-9])`;
+            }
+            
+            const strictRegex = new RegExp(regexSource, 'i');
+            
+            return (
+                strictRegex.test(fields.name) || 
+                strictRegex.test(fields.model) || 
+                strictRegex.test(fields.dimensions) || 
+                strictRegex.test(fields.manufacturer) || 
+                strictRegex.test(fields.category) ||
+                strictRegex.test(fields.location)
+            );
+        });
     });
 
     if (!matchesAll) return -1;
@@ -111,42 +194,50 @@ export const calculateRelevanceScore = (item: MaterialItem, keywords: string[]):
     keywords.forEach((k, idx) => {
         // Higher weight for the first keyword
         const multiplier = idx === 0 ? 2 : 1;
-        const escapedK = escapeRegExp(k);
+        const kExpanded = expandSearchTerms([k]);
 
-        // 3. Exact matches (Absolute priority)
-        if (fields.model === k) totalScore += 5000 * multiplier;
-        if (fields.dimensions === k) totalScore += 4000 * multiplier;
-        if (fields.name === k) totalScore += 3000 * multiplier;
+        kExpanded.forEach(expandedK => {
+            const escapedK = escapeRegExp(expandedK);
+            // Synonym matches are weighted slightly less than original keyword if we wanted, 
+            // but for now let's just make them count. 
+            // We'll use a matchMultiplier: 1.0 for original, 0.8 for synonyms.
+            const matchMultiplier = expandedK === k ? 1.0 : 0.8;
+            const weight = multiplier * matchMultiplier;
 
-        // 4. Boundary matches
-        // For alphabets, ensure not joined with other alphabets. For numbers, ensure not joined with other numbers.
-        let bRegexSource = escapedK;
-        if (/^[a-z]+$/.test(k)) {
-             bRegexSource = `(^|[^a-z])${escapedK}($|[^a-z])`;
-        } else if (/^[0-9]+$/.test(k)) {
-             bRegexSource = `(^|[^0-9])${escapedK}($|[^0-9])`;
-        } else {
-             bRegexSource = `(^|[\\s\\-/$])${escapedK}($|[\\s\\-/$])`;
-        }
+            // 3. Exact matches (Absolute priority)
+            if (fields.model === expandedK) totalScore += 5000 * weight;
+            if (fields.dimensions === expandedK) totalScore += 4000 * weight;
+            if (fields.name === expandedK) totalScore += 3000 * weight;
 
-        const boundaryRegex = new RegExp(bRegexSource, 'i');
-        if (boundaryRegex.test(fields.model)) totalScore += 1000 * multiplier;
-        if (boundaryRegex.test(fields.dimensions)) totalScore += 800 * multiplier;
-        if (boundaryRegex.test(fields.name)) totalScore += 600 * multiplier;
+            // 4. Boundary matches
+            let bRegexSource = escapedK;
+            if (/^[a-z]+$/.test(expandedK)) {
+                 bRegexSource = `(^|[^a-z])${escapedK}($|[^a-z])`;
+            } else if (/^[0-9]+$/.test(expandedK)) {
+                 bRegexSource = `(^|[^0-9])${escapedK}($|[^0-9])`;
+            } else {
+                 bRegexSource = `(^|[\\s\\-/$])${escapedK}($|[\\s\\-/$])`;
+            }
 
-        // 5. Starts-with matches
-        if (fields.model.startsWith(k)) totalScore += 500 * multiplier;
-        if (fields.dimensions.startsWith(k)) totalScore += 400 * multiplier;
-        if (fields.name.startsWith(k)) totalScore += 300 * multiplier;
-        if (fields.manufacturer.startsWith(k)) totalScore += 100 * multiplier;
+            const boundaryRegex = new RegExp(bRegexSource, 'i');
+            if (boundaryRegex.test(fields.model)) totalScore += 1000 * weight;
+            if (boundaryRegex.test(fields.dimensions)) totalScore += 800 * weight;
+            if (boundaryRegex.test(fields.name)) totalScore += 600 * weight;
 
-        // 6. Basic presence
-        if (fields.name.includes(k)) totalScore += 50;
-        if (fields.model.includes(k)) totalScore += 40;
-        if (fields.dimensions.includes(k)) totalScore += 30;
-        if (fields.manufacturer.includes(k)) totalScore += 20;
-        if (fields.category.includes(k)) totalScore += 10;
-        if (fields.location.includes(k)) totalScore += 5;
+            // 5. Starts-with matches
+            if (fields.model.startsWith(expandedK)) totalScore += 500 * weight;
+            if (fields.dimensions.startsWith(expandedK)) totalScore += 400 * weight;
+            if (fields.name.startsWith(expandedK)) totalScore += 300 * weight;
+            if (fields.manufacturer.startsWith(expandedK)) totalScore += 100 * weight;
+
+            // 6. Basic presence
+            if (fields.name.includes(expandedK)) totalScore += 50 * weight;
+            if (fields.model.includes(expandedK)) totalScore += 40 * weight;
+            if (fields.dimensions.includes(expandedK)) totalScore += 30 * weight;
+            if (fields.manufacturer.includes(expandedK)) totalScore += 20 * weight;
+            if (fields.category.includes(expandedK)) totalScore += 10 * weight;
+            if (fields.location.includes(expandedK)) totalScore += 5 * weight;
+        });
     });
 
     return totalScore;

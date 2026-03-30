@@ -1,60 +1,10 @@
 import { GoogleGenAI } from "@google/genai";
 import type { MaterialItem } from "../types";
 import { domainKnowledge } from './domainKnowledge';
+import { INDUSTRY_SYNONYMS } from './searchUtils';
 
 // APIキーは環境変数から取得
 const getAi = () => new GoogleGenAI({ apiKey: (import.meta as any).env?.VITE_GEMINI_API_KEY || "" });
-
-// 業界用語シノニム辞書（現場用語 → 検索キーワード群）
-const INDUSTRY_SYNONYMS: Record<string, string[]> = {
-    // エルボ・曲管系
-    'エルボ': ['エルボ', 'エル', 'elbow', 'el', '90l', '90°l', '45l', '45°l', 'LD', 'LS', 'LL', '曲管', 'エルボー'],
-    'エル': ['エルボ', 'エル', '90L', '90°L', 'L', 'LL', 'LS', 'LD', 'エルボー', '曲管'],
-    // チーズ・三叉管系
-    'チーズ': ['チーズ', 'ティー', 'tee', 'tj', 'ts', 'tl', 'T管', '三叉', '分岐'],
-    'ティー': ['チーズ', 'T', 'TJ', 'TS', 'TL', 'ティ', '三叉', '分岐'],
-    'ティ': ['チーズ', 'T', 'TJ', 'TS', '三叉'],
-    // ソケット系
-    'ソケット': ['ソケット', 'socket', 'sk', 'S', '継手'],
-    // ニップル系
-    'ニップル': ['ニップル', 'nipple', 'np', 'NI'],
-    // ユニオン系
-    'ユニオン': ['ユニオン', 'union', 'un'],
-    // フランジ系
-    'フランジ': ['フランジ', 'flange', 'fl', 'FF', 'RF'],
-    // バルブ系
-    'バルブ': ['バルブ', 'valve', 'VLV', 'V'],
-    'ゲートバルブ': ['ゲートバルブ', 'gate', 'GV', 'ゲート'],
-    'ボールバルブ': ['ボールバルブ', 'ball', 'BV', 'ボール'],
-    'グローブバルブ': ['グローブバルブ', 'globe', 'GLV', 'グローブ'],
-    'チェックバルブ': ['チェックバルブ', 'check', 'CV', 'チェック', '逆止'],
-    // キャップ・プラグ
-    'キャップ': ['キャップ', 'cap', 'CP', '盲'],
-    'プラグ': ['プラグ', 'plug', 'PL'],
-    // レジューサー・異径系
-    'レジューサー': ['レジューサー', 'reducer', 'RD', 'レデューサ', '異径'],
-    // 鋼管系（白ガス・黒管・白管）
-    '黒管': ['黒管', '黒SGP', 'SGP黒', '配管用炭素鋼鋼管', 'SGP', 'ガス管', 'GP'],
-    '白管': ['白管', '白SGP', 'SGP白', '白ガス管'],
-    '白ガス管': ['白SGP', 'SGP白', '白管', 'ガス管', 'SGP'],
-    'SGP': ['SGP', '黒管', '白管', '配管用炭素鋼鋼管', 'ガス管'],
-    // ステンレス系（モルコ管など）
-    'モルコ管': ['SU', 'SUS', 'ステンレス', 'モルコ', 'SA', 'SUS配管'],
-    'モルコ': ['SU', 'SUS', 'ステンレス', 'モルコ管'],
-    'SUS': ['SUS', 'SU', 'ステンレス', 'stainless', 'SA', 'モルコ管'],
-    // 塩ビ系
-    'VP': ['VP', '塩ビ', '塩化ビニル', 'PVC'],
-    'VU': ['VU', '薄肉塩ビ', '排水用'],
-    'HI': ['HI', '耐衝撃', '強化塩ビ'],
-    // ポリ系
-    'PE': ['PE', 'ポリ', 'ポリエチレン'],
-    'PP': ['PP', 'ポリプロ', 'ポリプロピレン'],
-    '架橋ポリ': ['架橋ポリ', 'バクマ', 'ハードロック', '架橋ポリエチレン管', 'ポリ管'],
-    // 工具系
-    'パイレン': ['パイプレンチ', 'パイレン'],
-    '全ねじ': ['全ねじ', '寸切り', '寸切', '全ネジ'],
-    'バンド': ['バンド', 'ハンガー', '吊り', '吊バンド', '吊りバンド'],
-};
 
 const expandSearchTerms = (text: string): string[] => {
     const lower = text.toLowerCase();
@@ -153,7 +103,14 @@ export const chatWithTakahashi = async (messages: any[], masterItems: MaterialIt
        - 「ソケ」→「ソケット」、「ニプ」→「ニップル」を検索
        - **取扱商品マスターリスト（knowledgeBase）に商品がある場合はIDを必ず使用する。**
 
-    3. **注文確認フロー（最重要）**:
+    3. **COREマスター優先原則（伝票作成時の鉄則）**:
+       - ユーザーが「国土交通省仕様」や「規格名称」で依頼してきた場合でも、**そのままの名称で伝票を起こさないでください**。
+       - 必ず提供された `knowledgeBase` の中から、**最も仕様が近い商品（近似値）を探し出し、その商品のIDを使用してください**。
+       - カート追加（ADD_CART）の際は、選んだ商品の `id`, `name`, `model`, `dimensions` を `knowledgeBase` のデータと完全に一致させて出力してください。
+       - 例：ユーザーが「配管用炭素鋼鋼管 50A」と言った場合、`knowledgeBase` に「SGP 50A 白」があれば、それを使ってください。
+       - 「あ、高橋です。国交省仕様の〇〇ですね。うちのマスターではこの『△△』がぴったりですので、これを入れておきますね」といった具合に、プロの判断でマスター品に変換したことを伝えてください。
+
+    4. **注文確認フロー（最重要）**:
        メモ・写真・複数品目の注文を受けた場合は、**絶対にいきなりカートに追加しない**。
        必ず以下の手順を踏むこと：
        
@@ -169,11 +126,11 @@ export const chatWithTakahashi = async (messages: any[], masterItems: MaterialIt
        ※ただし、単品1点の明確な注文（「VP50Aのエルボ1個持ってきて」など）でマスターにバッチリ確認済みの場合は即カート追加可。
 
     【アクションコマンド】
-    - カート追加: <<<ACTION|ADD_CART|[{"id":"必ずknowledgeBaseのidを入れる。不明な場合は空文字にする","name":"品名（実際のknowledgeBaseのnameと同じにする）","quantity":数量,"model":"knowledgeBaseのmodelと同じ、または推測した型式","dimensions":"knowledgeBaseのdimensionsと同じ、または推測した寸法"}]>>>
-      ※資材IDが不明な場合やマスターにない完全な新規商品の場合は「id」を空文字""にしてください。IDがない場合でも必ず「name」「model」「dimensions」は分けて出力してください。全てを「name」に繋げて出力してはいけません。
-      ※取扱商品マスターリスト(knowledgeBase)にある商品は必ずそのIDを使用してください。
+    - カート追加: <<<ACTION|ADD_CART|[{"id":"必ずknowledgeBaseから検索したidを入れる。どうしてもない場合のみ空文字にする","name":"品名（実際のknowledgeBaseのnameと完全に一致させる）","quantity":数量,"model":"knowledgeBaseのmodelと同じ","dimensions":"knowledgeBaseのdimensionsと同じ"}]>>>
+      ※資材IDが不明な場合やマスターにない完全な新規商品の場合は「id」を空文字""にしてください。
+      ※取扱商品マスターリスト(knowledgeBase)にある商品は必ずそのIDを使用してください。名称のブレは許されません。
 
-    【あなたの知識（取扱商品マスターリスト）】
+    【あなたの知識（取扱商品マスターリスト：必ずここから選ぶこと）】
     ${JSON.stringify(knowledgeBase)}
   `;
 
