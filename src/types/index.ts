@@ -82,7 +82,8 @@ export interface Slip {
     deliveryDestination: DeliveryDestination;
     isClosed?: boolean;
     siteSummaries?: { name: string; total: number }[];
-    orderingPerson?: string; // UID of the orderer
+    orderingPerson?: string; // Display name or UID depends on internal mapping
+    orderingPersonId?: string; // Always UID for internal filtering
     orderingPersonName?: string; // Display name of the orderer
     orderingCompanyName?: string; // Company name of the orderer
     receivingPerson?: string;

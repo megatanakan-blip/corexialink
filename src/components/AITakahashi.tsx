@@ -34,9 +34,14 @@ interface AITakahashiProps {
     currentScreen?: string;
     messages: Message[];
     setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
+    cart?: { [id: string]: { item: MaterialItem, quantity: number } };
+    orderHistory?: any[];
 }
 
-export const AITakahashi: React.FC<AITakahashiProps> = ({ masterItems, onAddToCart, currentScreen = 'LINK_LITE', messages, setMessages }) => {
+export const AITakahashi: React.FC<AITakahashiProps> = ({ 
+    masterItems, onAddToCart, currentScreen = 'LINK_LITE', messages, setMessages,
+    cart = {}, orderHistory = []
+}) => {
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [selectedImage, setSelectedImage] = useState<{ file: File, base64: string } | null>(null);
@@ -117,7 +122,7 @@ export const AITakahashi: React.FC<AITakahashiProps> = ({ masterItems, onAddToCa
                 parts: userMsg.parts
             });
 
-            const response = await gemini.chatWithTakahashi(chatHistory, masterItems, currentScreen);
+            const response = await gemini.chatWithTakahashi(chatHistory, masterItems, currentScreen, { cart, orderHistory });
             let fullText = response.text || "";
 
             const sources: Source[] = [];

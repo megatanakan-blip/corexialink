@@ -67,7 +67,8 @@ export const createOrder = async (
         grandTotal: totalAmount + taxAmount,
         deliveryTime: deliveryTime as any,
         deliveryDestination: deliveryDestination as any,
-        orderingPerson: uid,
+        orderingPerson: orderingPersonName || uid, // For CORE UI visibility
+        orderingPersonId: uid, // For internal filtering
         orderingPersonName: orderingPersonName,
         orderingCompanyName: orderingCompanyName,
         isHandled: false,
@@ -84,7 +85,7 @@ export const createOrder = async (
 export const subscribeToMyOrders = (uid: string, cb: (s: Slip[]) => void): Unsubscribe => {
     const q = query(
         collection(db, COLLECTIONS.SLIPS),
-        where('orderingPerson', '==', uid)
+        where('orderingPersonId', '==', uid)
     );
 
     return onSnapshot(q, (snapshot) => {
@@ -150,7 +151,8 @@ export const createEstimate = async (
         validUntil: expirationDate,
         deliveryTime: 'none',
         deliveryDestination: 'none',
-        orderingPerson: uid,
+        orderingPerson: orderingPersonName || uid,
+        orderingPersonId: uid,
         orderingPersonName: orderingPersonName,
         orderingCompanyName: orderingCompanyName,
         isHandled: false,
@@ -165,7 +167,7 @@ export const createEstimate = async (
 export const subscribeToMyEstimates = (uid: string, cb: (e: any[]) => void): Unsubscribe => {
     const q = query(
         collection(db, 'estimates'),
-        where('orderingPerson', '==', uid)
+        where('orderingPersonId', '==', uid)
     );
 
     return onSnapshot(q, (snapshot) => {

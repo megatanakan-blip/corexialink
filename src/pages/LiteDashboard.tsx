@@ -148,43 +148,251 @@ export const LiteDashboard: React.FC = () => {
         });
     }, []);
 
+    // COREマスターデータからAI提案アイテムの最近似値を探す
+    const findBestMasterMatch = useCallback((aiItem: any): MaterialItem | null => {
+        if (!materials || materials.length === 0) return null;
+
+        // ===== フィルター群 =====
+
+        // 1. 材質一致フィルター
+        // クエリに「白」がある → 結果にも「白」が必要（MRジョイント・Wプレスなど非白品を除外）
+        // クエリに「白」がある → ステン/モルコは除外
+        const filterByMaterialConsistency = (results: MaterialItem[], qName: string): MaterialItem[] => {
+            const qLow = (qName || '').toLowerCase();
+
+            const filtered = results.filter(item => {
+                const rLow = [(item.name || ''), (item.model || ''), (item.category || '')].join(' ').toLowerCase();
+
+                // 「白」クエリ → 結果に「白」が必須（ライトカバー, MRジョイント等を排除）
+                if (qLow.includes('白')) {
+                    if (!rLow.includes('白')) return false;
+                    // 白クエリに対してステン/モルコは除外
+                    if (['ステン', 'sus', 'モルコ', 'su管'].some(ex => rLow.includes(ex))) return false;
+                }
+
+                // 「黒」クエリ → 結果に「黒」が必須
+                if (qLow.includes('黒')) {
+                    if (!rLow.includes('黒')) return false;
+                }
+
+                // クエリ材質指定なくてもステン/モルコは追加しない
+                if (!qLow.includes('ステン') && !qLow.includes('sus') && !qLow.includes('モルコ')) {
+                    if (['ステン', 'sus', 'モルコ', 'su管'].some(ex => rLow.includes(ex))) return false;
+                }
+
+                // VP/VUクエリ → 白SGP除外
+                if (qLow.includes('vp') && ['sgp', '白管', '黒管'].some(ex => rLow.includes(ex))) return false;
+                if (qLow.includes('vu') && ['sgp'].some(ex => rLow.includes(ex))) return false;
+
+                return true;
+            });
+            return filtered.length > 0 ? filtered : results;
+        };
+
+        // 2. 特殊品種フィルター
+        // 短管・ニップル・45L（45度エルボ）・ライニング管は明示指定なければ除外
+        const filterSpecificItems = (results: MaterialItem[], qName: string): MaterialItem[] => {
+            const qLow = (qName || '').toLowerCase();
+            const SPECIFIC_KEYWORDS = [
+                '短管',
+                'ニップル', 'nipple',
+                '45l',          // 45度エルボ（L/エルボ指示では90度が標準、45度は別物）
+                'ライニング',    // ライニング管（VB管等）は通常の白ガス管と別物
+            ];
+            const filtered = results.filter(item => {
+                const rLow = (item.name || '').toLowerCase();
+                return !SPECIFIC_KEYWORDS.some(kw => rLow.includes(kw) && !qLow.includes(kw));
+            });
+            return filtered;
+        };
+
+
+        // 3. 品種タイプ一貫性フィルター（Positive matching）
+        // 「白ガス管」クエリ → 結果にも「管/パイプ/SGP」が必要（ライトカバーを排除）
+        const filterByProductType = (results: MaterialItem[], qName: string): MaterialItem[] => {
+            const qLow = (qName || '').toLowerCase();
+            const isPipeQuery = /(パイプ|sgp|白管|黒管|ガス管|水道管)/.test(qLow) &&
+                                !/(ソケット|エルボ|継手|バンド|チーズ|カップリング)/.test(qLow);
+            if (isPipeQuery) {
+                const filtered = results.filter(item => {
+                    const rLow = (item.name || '').toLowerCase();
+                    // 管/パイプ/SGP(配管材)のいずれかが品名に含まれること
+                    return /(管|パイプ|pipe|sgp|鋼管)/.test(rLow);
+                });
+                console.log(`[AI Match] 管クエリ絞り込み: ${results.length}→${filtered.length}件`);
+                return filtered;
+            }
+            return results;
+        };
+
+        // 4. カテゴリ/名称の排他フィルター
+        // 「全ねじ/寸切り」クエリ → 「テープ/ヒーター」を排除
+        // 「テープ/ヒーター」クエリ → 「全ねじ」を排除
+        const filterByExclusion = (results: MaterialItem[], qName: string): MaterialItem[] => {
+            const qLow = (qName || '').toLowerCase();
+            const isBoltQuery = /(全ねじ|寸切り|全ネジ|ボルト)/.test(qLow);
+            const isTapeQuery = /(テープ|ヒーター)/.test(qLow);
+
+            if (isBoltQuery) {
+                const filtered = results.filter(item => {
+                    const rLow = (item.name || '').toLowerCase();
+                    return !/(テープ|ヒーター)/.test(rLow);
+                });
+                return filtered.length > 0 ? filtered : results;
+            }
+            if (isTapeQuery) {
+                const filtered = results.filter(item => {
+                    const rLow = (item.name || '').toLowerCase();
+                    return !/(全ねじ|寸切り|全ネジ|ボルト)/.test(rLow);
+                });
+                return filtered.length > 0 ? filtered : results;
+            }
+            return results;
+        };
+
+        // 全フィルター + 非CKMA優先
+        const applyFilters = (results: MaterialItem[], qName: string): MaterialItem[] => {
+            const f1 = filterSpecificItems(results, qName);
+            const f2 = filterByMaterialConsistency(f1, qName);
+            const f3 = filterByProductType(f2, qName);
+            const f4 = filterByExclusion(f3, qName);
+            const qLow = (qName || '').toLowerCase();
+            if (!qLow.includes('ckma') && !qLow.includes('カムロック')) {
+                const nonCkma = f4.filter(item => {
+                    const rLow = (item.name || '').toLowerCase();
+                    return !rLow.includes('ckma') && !rLow.includes('カムロック') && !rLow.includes('ロック付');
+                });
+                if (nonCkma.length > 0) return nonCkma;
+            }
+            return f4;
+        };
+
+        // AIの正式名称をメモに近い簡潔な語に変換してから検索
+        // 業界常識マッピングも適用: 白管/白ガス管/白パイプ → 白SGP
+        const simplifySearchQuery = (name: string): string => {
+            return (name || '')
+                .replace(/ねじ込み継手?/g, '')         // マスターにない「ねじ込み継手」を削除
+                .replace(/配管用炭素鋼鋼管/g, '')        // JIS規格名称を削除
+                .replace(/90°?/g, '')                  // 角度記号を削除（エルボは残る）
+                .replace(/[（(]([^）)]*)[）)]/g, ' $1 ') // 括弧の中身を取り出す: (白SGP)→白SGP
+                // 業界常識: 白管/白ガス管/白パイプ → 白SGP
+                .replace(/白(ガス)?管/g, '白SGP')
+                .replace(/白パイプ/g, '白SGP')
+                // 業界常識: 黒管/黒ガス管/黒パイプ → 黒SGP
+                .replace(/黒(ガス)?管/g, '黒SGP')
+                .replace(/黒パイプ/g, '黒SGP')
+                .replace(/\s+/g, ' ')
+                .trim();
+        };
+
+        // Step 1: IDが存在すれば完全一致を優先
+        // ただしCKMAが返ってきた場合で、モデルコードが単純（L/S等）なら非CKMAを優先探索
+        if (aiItem.id) {
+            const exactById = materials.find(m => m.id === aiItem.id);
+            if (exactById) {
+                const isCkmaResult = (exactById.name || '').toLowerCase().includes('ckma');
+                const isSimpleModel = aiItem.model && /^[a-zA-Z]{1,3}$/.test(aiItem.model.trim());
+                if (isCkmaResult && isSimpleModel) {
+                    // L/S等の単純モデルコードでCKMAが返った → 同モデルの非CKMA品を寸法一致で探す
+                    const nonCkmaByModel = materials.filter(m => {
+                        const rLow = (m.name || '').toLowerCase();
+                        if (rLow.includes('ckma') || rLow.includes('カムロック') || rLow.includes('ロック付')) return false;
+                        return (m.model || '').toLowerCase().trim() === aiItem.model.toLowerCase().trim();
+                    });
+                    if (nonCkmaByModel.length > 0) {
+                        // filterAndSortItemsで寸法一致も確認してから返す（150mmソケットを20Aで選ばない）
+                        const modelDimQuery = [aiItem.model, aiItem.dimensions].filter(Boolean).join(' ');
+                        const sorted = filterAndSortItems(nonCkmaByModel, modelDimQuery);
+                        const best = applyFilters(sorted.length > 0 ? sorted : nonCkmaByModel, aiItem.name);
+                        if (best.length > 0) {
+                            console.log(`[AI Match] CKMA→非CKMA代替 model="${aiItem.model}" dim="${aiItem.dimensions}": ${exactById.name} → ${best[0].name}`);
+                            return best[0];
+                        }
+                    }
+                }
+
+                console.log(`[AI Match] ID完全一致: ${aiItem.id} → ${exactById.name}`);
+                return exactById;
+            }
+
+        }
+
+        // Step 2: 簡潔化した name + model + dimensions でフル検索
+        // 「白ねじ込み継手エルボ」→「白エルボ」に変換してから「白エルボ L 20A」で検索
+        const simpleName = simplifySearchQuery(aiItem.name);
+        const queryParts = [simpleName, aiItem.model, aiItem.dimensions].filter(Boolean);
+        if (queryParts.length > 0) {
+            const fullQuery = queryParts.join(' ');
+            const fullResults = filterAndSortItems(materials, fullQuery);
+            if (fullResults.length > 0) {
+                const best = applyFilters(fullResults, aiItem.name);
+                console.log(`[AI Match] フル検索 ("${fullQuery}"←"${aiItem.name}"): → ${best[0].name} [${best[0].model}/${best[0].dimensions}]`);
+                return best[0];
+            }
+        }
+
+        // Step 3: 簡潔化した name + dimensions のみで検索（modelを除く）
+        const dimParts = [simpleName, aiItem.dimensions].filter(Boolean);
+        if (dimParts.length > 0) {
+            const dimQuery = dimParts.join(' ');
+            const dimResults = filterAndSortItems(materials, dimQuery);
+            if (dimResults.length > 0) {
+                const best = applyFilters(dimResults, aiItem.name);
+                console.log(`[AI Match] 寸法付き検索 ("${dimQuery}"): → ${best[0].name} [${best[0].dimensions}]`);
+                return best[0];
+            }
+        }
+
+        // Step 4: 元のname（変換前）でもう一度試す（フォールバック）
+        if (aiItem.name) {
+            const nameResults = filterAndSortItems(materials, aiItem.name);
+            if (nameResults.length > 0) {
+                const best = applyFilters(nameResults, aiItem.name);
+                console.warn(`[AI Match] 元名称フォールバック: "${aiItem.name}" → ${best[0].name} [${best[0].dimensions}]`);
+                return best[0];
+            }
+        }
+
+        console.warn(`[AI Match] マスター未照合: name="${aiItem.name}" model="${aiItem.model}" dim="${aiItem.dimensions}"`);
+        return null;
+    }, [materials]);
+
+
+
     const handleAIAddToCart = useCallback((items: any[], silent: boolean = false) => {
         try {
             items.forEach(item => {
-                const matItem: MaterialItem = {
-                    id: item.id || '',
-                    name: item.name,
-                    quantity: 0,
-                    category: 'AI追加',
-                    model: item.model || '',
-                    dimensions: item.dimensions || '',
-                    unit: '個',
-                    location: '',
-                    listPrice: 0,
-                    sellingPrice: 0,
-                    costPrice: 0,
-                    updatedAt: Date.now()
-                };
-                
-                // Try exact ID match first
-                let existing = materials.find(m => m.id === item.id);
-                
-                // If ID match fails or ID is empty, use powerful fallback search
-                if (!existing && item.name) {
-                    const searchResults = filterAndSortItems(materials, item.name);
-                    if (searchResults.length > 0) {
-                        existing = searchResults[0];
-                        console.log(`[AI Cart Fallback] Mapped '${item.name}' to Master Item:`, existing);
-                    }
+                // マスターデータから最近似値を探す
+                const masterMatch = findBestMasterMatch(item);
+
+                if (masterMatch) {
+                    // マスターデータが見つかった場合はそれを使用
+                    handleAddToCart(masterMatch, item.quantity);
+                } else {
+                    // マスターにない場合はAIの情報でフォールバック作成
+                    const fallbackItem: MaterialItem = {
+                        id: item.id || '',
+                        name: item.name,
+                        quantity: 0,
+                        category: 'AI追加',
+                        model: item.model || '',
+                        dimensions: item.dimensions || '',
+                        unit: '個',
+                        location: '',
+                        listPrice: 0,
+                        sellingPrice: 0,
+                        costPrice: 0,
+                        updatedAt: Date.now()
+                    };
+                    console.warn(`[AI Cart] マスター未照合のためAI情報で追加: ${item.name}`);
+                    handleAddToCart(fallbackItem, item.quantity);
                 }
-                
-                handleAddToCart(existing || matItem, item.quantity);
             });
             if (!silent) alert('カートに追加しました');
         } catch (error) {
             console.error("AI Cart update error:", error);
         }
-    }, [materials, handleAddToCart]);
+    }, [materials, handleAddToCart, findBestMasterMatch]);
 
     // Sync selected slip with real-time updates from orderHistory
     useEffect(() => {
@@ -515,7 +723,7 @@ export const LiteDashboard: React.FC = () => {
                                         className="bg-white rounded-xl p-4 shadow-sm border border-slate-100 relative overflow-hidden active:scale-[0.98] transition-all cursor-pointer hover:border-brand-green/30"
                                     >
                                         {/* Highlight own orders vs others */}
-                                        {slip.orderingPerson !== currentUser?.uid && (
+                                        {slip.orderingPersonId !== currentUser?.uid && (
                                             <div className="absolute top-0 right-0 bg-yellow-100 text-yellow-800 text-[10px] px-2 py-0.5 rounded-bl-lg font-bold">
                                                 他メンバー
                                             </div>
@@ -526,7 +734,7 @@ export const LiteDashboard: React.FC = () => {
                                                     {slip.date} {slip.createdAt ? new Date(slip.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
                                                 </div>
                                                 <div className="font-bold text-slate-800">注文数: {slip.items.length}点</div>
-                                                {slip.orderingPerson !== currentUser?.uid && (
+                                                {slip.orderingPersonId !== currentUser?.uid && (
                                                     <div className="text-[10px] text-brand-green font-bold mt-1">
                                                         発注者: {slip.orderingPersonName || '不明'} ({slip.orderingCompanyName || '不明'})
                                                     </div>
@@ -568,6 +776,8 @@ export const LiteDashboard: React.FC = () => {
                                 onAddToCart={handleAIAddToCart}
                                 messages={messages}
                                 setMessages={setMessages}
+                                cart={cart}
+                                orderHistory={orderHistory}
                             />
                         </DebugErrorBoundary>
                     </div>

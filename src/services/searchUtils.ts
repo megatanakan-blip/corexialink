@@ -49,7 +49,6 @@ export const INDUSTRY_SYNONYMS: Record<string, string[]> = {
     '架橋ポリ': ['架橋ポリ', 'バクマ', 'ハードロック', '架橋ポリエチレン管', 'ポリ管'],
     // 工具系
     'パイレン': ['パイプレンチ', 'パイレン'],
-    '全ねじ': ['全ねじ', '寸切り', '寸切', '全ネジ'],
     'バンド': ['バンド', 'ハンガー', '吊り', '吊バンド', '吊りバンド'],
     // 国土交通省仕様・JIS規格名
     '配管用炭素鋼鋼管': ['SGP', '黒管', '白管', 'ガス管', 'GP'],
@@ -60,11 +59,18 @@ export const INDUSTRY_SYNONYMS: Record<string, string[]> = {
     '水道用硬質塩化ビニルライニング鋼管': ['SGP-VA', 'SGP-VB', 'SGP-VD', 'ライニング管', 'VA', 'VB', 'VD', 'V-LP'],
     '水配管用亜鉛めっき鋼管': ['SGPW', '白管', 'W', 'SGP-W'],
     // 継手種類
+    '白L': ['白ねじ込み継手', '90L', 'エルボ', 'エル'],
+    'S': ['ソケット', '白ねじ込み継手', 'SK'],
+    '白ガス': ['白ガス管', 'SGP-W', '白SGP'],
+    '全ねじ': ['全ねじ', '寸切り', '寸切', '全ネジ', '寸切ボルト', '全ねじボルト'],
+    '寸切り': ['全ねじ', '寸切り', '寸切', '全ネジ', '寸切ボルト', '全ねじボルト'],
+    '全ネジ': ['全ねじボルト', '寸切り', 'W3/8', '3/8'],
     '径違い': ['異径', 'レジューサー', 'RD', 'RC', '異径継手'],
     '異径': ['径違い', 'レジューサー', 'RD', 'RC', '異径継手'],
     'めねじ': ['メス', '内ねじ', 'ねじ込'],
     'おねじ': ['オス', '外ねじ', 'ねじ込'],
-    // サイズ対応（インチ呼び ↔ A呼び）
+    // サイズ対応（インチ呼び ↔ A呼び ↔ 分呼び）
+    '3/8': ['3分', '10A', '10'],
     '1/2': ['15A', '15', '4分'],
     '3/4': ['20A', '20', '6分'],
     '1': ['25A', '25', '1インチ'],
@@ -158,8 +164,17 @@ export const normalizeForSearch = (text: string): string => {
     // 4. Lowercase
     normalized = normalized.toLowerCase();
 
-    // 5. Replace full-width space with half-width for consistency
-    normalized = normalized.replace(/　/g, ' ');
+    // 5. Replace full-width space and symbols with half-width space for consistency
+    // Symbols like ( ) [ ] { } - / . ° are treated as word separators
+    normalized = normalized.replace(/[　\(\)\[\]\{\}\-\/\.・°]/g, ' ');
+
+    // 6. Handle common concatenated terms like "白SGP" -> "白 SGP"
+    normalized = normalized.replace(/(白|黒|sgp|sus|vp|vu)(白|黒|sgp|sus|vp|vu)/g, '$1 $2');
+    normalized = normalized.replace(/(白|黒|sgp|sus|vp|vu)(\d+)/g, '$1 $2'); // SGP50 -> SGP 50
+    normalized = normalized.replace(/(\d+)(a|b|インチ)/g, '$1 $2'); // 50A -> 50 A
+
+    // Final cleanup of multiple spaces
+    normalized = normalized.replace(/\s+/g, ' ').trim();
 
     return normalized;
 };
