@@ -237,7 +237,14 @@ export const AITakahashi: React.FC<AITakahashiProps> = ({
                         <div className={`max-w-[85%] p-3 rounded-2xl text-sm leading-relaxed shadow-sm ${m.role === 'user' ? 'bg-brand-green text-white rounded-tr-none' : 'bg-white text-slate-800 border border-slate-100 rounded-tl-none'}`}>
                             {m.imagePreview && (
                                 <div className="mb-2 rounded-lg overflow-hidden border border-white/20">
-                                    <img src={m.imagePreview} alt="User Upload" className="w-full h-auto max-h-48 object-cover" />
+                                    {m.imagePreview.startsWith('data:application/pdf') ? (
+                                        <div className="bg-slate-100 p-4 flex flex-col items-center justify-center gap-2">
+                                            <div className="w-12 h-12 bg-rose-100 text-rose-600 rounded flex items-center justify-center font-bold text-xs">PDF</div>
+                                            <div className="text-[10px] text-slate-500 font-bold truncate max-w-full">PDFドキュメント</div>
+                                        </div>
+                                    ) : (
+                                        <img src={m.imagePreview} alt="User Upload" className="w-full h-auto max-h-48 object-cover" />
+                                    )}
                                 </div>
                             )}
 
@@ -311,8 +318,15 @@ export const AITakahashi: React.FC<AITakahashiProps> = ({
             <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-slate-200 p-3 z-10">
                 {selectedImage && (
                     <div className="absolute bottom-full left-0 m-3 mb-1">
-                        <div className="relative w-16 h-16 rounded-lg overflow-hidden border-2 border-brand-green/20 shadow-md bg-white">
-                            <img src={`data:${selectedImage.file.type};base64,${selectedImage.base64}`} className="w-full h-full object-cover" />
+                        <div className="relative w-16 h-16 rounded-lg overflow-hidden border-2 border-brand-green/20 shadow-md bg-white flex items-center justify-center">
+                            {selectedImage.file.type === 'application/pdf' ? (
+                                <div className="flex flex-col items-center">
+                                    <div className="text-rose-600 font-black text-xs">PDF</div>
+                                    <div className="text-[8px] text-slate-400 mt-0.5 truncate max-w-[50px]">{selectedImage.file.name}</div>
+                                </div>
+                            ) : (
+                                <img src={`data:${selectedImage.file.type};base64,${selectedImage.base64}`} className="w-full h-full object-cover" />
+                            )}
                             <button onClick={() => setSelectedImage(null)} className="absolute top-0 right-0 bg-slate-900/50 text-white p-0.5 rounded-bl-md">
                                 <X size={12} />
                             </button>
@@ -326,7 +340,7 @@ export const AITakahashi: React.FC<AITakahashiProps> = ({
                     >
                         <Camera size={20} />
                     </button>
-                    <input type="file" ref={fileInputRef} onChange={handleFileSelect} className="hidden" accept="image/*" />
+                    <input type="file" ref={fileInputRef} onChange={handleFileSelect} className="hidden" accept="image/*,application/pdf" />
 
                     <div className="flex-1 relative">
                         <input

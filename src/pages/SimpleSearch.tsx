@@ -46,7 +46,6 @@ export const SimpleSearch: React.FC<SimpleSearchProps> = ({ onAddToCart, onUpdat
             ? items 
             : items.filter(item => item.category?.trim() === selectedCategory);
             
-        if (!query.trim()) return categoryFiltered;
         return filterAndSortItems(categoryFiltered, query);
     }, [items, selectedCategory, query]);
 

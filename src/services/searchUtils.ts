@@ -295,14 +295,91 @@ export const calculateRelevanceScore = (item: MaterialItem, keywords: string[]):
     return totalScore;
 };
 
+/**
+ * Parses dimension string into an array of numbers for comparison.
+ * Handles "15A", "20 x 15", "1/2", etc.
+ */
+export const parseDimensionToNumbers = (dim: string): number[] => {
+    if (!dim) return [999999];
+
+    // Common industry fraction to A-nominal mapping
+    const fracMap: Record<string, number> = {
+        '1/8': 6, '1/4': 8, '3/8': 10, '1/2': 15, '3/4': 20, '1': 25,
+        '1-1/4': 32, '1 1/4': 32, '1.1/4': 32,
+        '1-1/2': 40, '1 1/2': 40, '1.1/2': 40,
+        '2': 50, '2-1/2': 65, '2 1/2': 65,
+        '3': 80, '4': 100, '5': 125, '6': 150
+    };
+
+    // Normalize: full-width to half-width, lowercase
+    const normalized = dim.replace(/[！-～]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0xFEE0))
+                          .toLowerCase()
+                          .trim();
+
+    // Split by common separators (space, x, ×, ・, comma)
+    // Note: We don't split by '-' here to preserve '1-1/4'
+    const parts = normalized.split(/[\s×x・,]+/).filter(p => p.length > 0);
+    
+    if (parts.length === 0) return [999999];
+
+    return parts.map(part => {
+        // Check for known fractions/inch strings first
+        if (fracMap[part]) return fracMap[part];
+        
+        // Handle "15A", "20B", "100mm" etc - extract leading number
+        const leadingNumMatch = part.match(/^(\d+(\.\d+)?)/);
+        if (leadingNumMatch) return parseFloat(leadingNumMatch[1]);
+        
+        // Handle "SU15" etc - extract any number
+        const anyNumMatch = part.match(/(\d+(\.\d+)?)/);
+        if (anyNumMatch) return parseFloat(anyNumMatch[1]);
+        
+        return 999999;
+    });
+};
+
+/**
+ * Compares two dimension arrays numerically.
+ */
+export const compareDimensions = (dimA: string, dimB: string): number => {
+    const numsA = parseDimensionToNumbers(dimA);
+    const numsB = parseDimensionToNumbers(dimB);
+    
+    const maxLen = Math.max(numsA.length, numsB.length);
+    for (let i = 0; i < maxLen; i++) {
+        const a = numsA[i] !== undefined ? numsA[i] : -1; // -1 so "20" comes before "20x15"
+        const b = numsB[i] !== undefined ? numsB[i] : -1;
+        if (a !== b) return a - b;
+    }
+    return 0;
+};
+
 export const filterAndSortItems = (items: MaterialItem[], query: string): MaterialItem[] => {
     const normalizedQuery = normalizeForSearch(query);
     const keywords = normalizedQuery.split(' ').filter(k => k.length > 0);
-    if (keywords.length === 0) return items;
+    
+    // Default sort by size when no query is present
+    if (keywords.length === 0) {
+        return [...items].sort((a, b) => {
+            const dimCompare = compareDimensions(a.dimensions || a.size || '', b.dimensions || b.size || '');
+            if (dimCompare !== 0) return dimCompare;
+            return (a.name || "").localeCompare(b.name || "", 'ja');
+        });
+    }
 
     return items
         .map(item => ({ item, score: calculateRelevanceScore(item, keywords) }))
         .filter(result => result.score >= 0)
-        .sort((a, b) => b.score - a.score)
+        .sort((a, b) => {
+            // Primary: Relevance Score (Descending)
+            if (b.score !== a.score) return b.score - a.score;
+            
+            // Secondary: Size (Ascending)
+            const dimCompare = compareDimensions(a.item.dimensions || a.item.size || '', b.item.dimensions || b.item.size || '');
+            if (dimCompare !== 0) return dimCompare;
+            
+            // Tertiary: Name (Alphabetical)
+            return (a.item.name || "").localeCompare(b.item.name || "", 'ja');
+        })
         .map(result => result.item);
 };

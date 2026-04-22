@@ -930,7 +930,7 @@ export const LiteDashboard: React.FC = () => {
             {isSiteManagerOpen && (
                 <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
                     <div className="bg-white rounded-2xl w-full max-w-sm max-h-[80vh] overflow-y-auto relative shadow-2xl animate-in zoom-in-95 duration-200">
-                        <button onClick={() => setIsSiteManagerOpen(false)} className="absolute top-4 right-4 p-2 bg-slate-100 rounded-full hover:bg-slate-200">
+                        <button onClick={() => setIsSiteManagerOpen(false)} className="absolute top-4 right-4 p-2 bg-slate-100 rounded-full hover:bg-slate-200 z-10">
                             <X size={16} className="text-slate-500" />
                         </button>
                         <div className="p-6">

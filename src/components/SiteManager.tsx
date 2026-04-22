@@ -180,7 +180,7 @@ export const SiteManager: React.FC<SiteManagerProps> = ({ onSiteSelect, currentS
 
     return (
         <div className="space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between pr-8">
                 <h3 className="font-bold text-slate-800 flex items-center gap-2"><Building2 size={18} /> 現場リスト</h3>
                 <div className="flex gap-2 text-xs">
                     <button onClick={() => { setMode('join'); resetForm(); }} className="text-blue-600 bg-blue-50 px-3 py-1.5 rounded-lg font-bold">コード入力</button>
