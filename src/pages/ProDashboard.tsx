@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import {
     Home, Search, ShoppingCart, User, LogOut,
-    MessageSquare, FilePlus, History, Loader2, Trash2, CheckCircle, Building2, X
+    MessageSquare, FilePlus, History, Loader2, CheckCircle, Building2, X
 } from 'lucide-react';
 import { auth } from '../firebaseConfig';
 import { SimpleSearch } from './SimpleSearch';

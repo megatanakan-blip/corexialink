@@ -357,29 +357,107 @@ export const compareDimensions = (dimA: string, dimB: string): number => {
 export const filterAndSortItems = (items: MaterialItem[], query: string): MaterialItem[] => {
     const normalizedQuery = normalizeForSearch(query);
     const keywords = normalizedQuery.split(' ').filter(k => k.length > 0);
-    
-    // Default sort by size when no query is present
+
     if (keywords.length === 0) {
         return [...items].sort((a, b) => {
             const dimCompare = compareDimensions(a.dimensions || a.size || '', b.dimensions || b.size || '');
             if (dimCompare !== 0) return dimCompare;
-            return (a.name || "").localeCompare(b.name || "", 'ja');
+            return (a.name || '').localeCompare(b.name || '', 'ja');
         });
     }
 
+    // ── Pre-computation: runs ONCE per query, not once per item ──────────────
+
+    interface TermData { term: string; matchRx: RegExp; boundaryRx: RegExp; }
+
+    const buildTermData = (term: string): TermData => {
+        const escaped = escapeRegExp(term);
+        let matchSrc: string;
+        let boundarySrc: string;
+        if (/^[a-z]+$/.test(term)) {
+            matchSrc = `(^|[^a-z])${escaped}($|[^a-z])`;
+            boundarySrc = matchSrc;
+        } else if (/^[0-9]+$/.test(term)) {
+            matchSrc = `(^|[^0-9])${escaped}($|[^0-9])`;
+            boundarySrc = matchSrc;
+        } else {
+            matchSrc = escaped;
+            boundarySrc = `(^|[\\s\\-/$])${escaped}($|[\\s\\-/$])`;
+        }
+        return { term, matchRx: new RegExp(matchSrc, 'i'), boundaryRx: new RegExp(boundarySrc, 'i') };
+    };
+
+    // expandedSets[i] = pre-compiled TermData list for all synonyms of keywords[i]
+    const expandedSets: TermData[][] = keywords.map(k =>
+        expandSearchTerms([k]).map(buildTermData)
+    );
+
+    const fullQuery = keywords.join(' ');
+
+    // ── Per-item scoring (uses only pre-compiled data, no RegExp creation) ───
+
+    const scoreItem = (item: MaterialItem): number => {
+        const n   = normalizeForSearch(item.name         || '');
+        const m   = normalizeForSearch(item.model        || '');
+        const d   = normalizeForSearch(item.dimensions   || '');
+        const mfr = normalizeForSearch(item.manufacturer || '');
+        const cat = normalizeForSearch(item.category     || '');
+        const loc = normalizeForSearch(item.location     || '');
+
+        // AND filter: every keyword group must hit at least one field
+        const matchesAll = expandedSets.every(termList =>
+            termList.some(({ matchRx }) =>
+                matchRx.test(n) || matchRx.test(m) || matchRx.test(d) ||
+                matchRx.test(mfr) || matchRx.test(cat) || matchRx.test(loc)
+            )
+        );
+        if (!matchesAll) return -1;
+
+        let score = 0;
+        const combined = `${n} ${m} ${d}`.trim();
+        if (combined.replace(/\s+/g, '') === fullQuery.replace(/\s+/g, '')) score += 15000;
+        else if (combined === fullQuery) score += 10000;
+        const masterWords = n.split(/\s+/).filter(Boolean);
+        if (masterWords.length === keywords.length && masterWords.every(w => keywords.includes(w))) score += 12000;
+        if (combined.startsWith(fullQuery)) score += 5000;
+
+        expandedSets.forEach((termList, idx) => {
+            const mul = idx === 0 ? 2 : 1;
+            const origTerm = keywords[idx];
+            termList.forEach(({ term, boundaryRx }) => {
+                const w = mul * (term === origTerm ? 1.0 : 0.8);
+                if (m === term) score += 5000 * w;
+                if (d === term) score += 4000 * w;
+                if (n === term) score += 3000 * w;
+                if (boundaryRx.test(m)) score += 1000 * w;
+                if (boundaryRx.test(d)) score += 800 * w;
+                if (boundaryRx.test(n)) score += 600 * w;
+                if (m.startsWith(term)) score += 500 * w;
+                if (d.startsWith(term)) score += 400 * w;
+                if (n.startsWith(term)) score += 300 * w;
+                if (mfr.startsWith(term)) score += 100 * w;
+                if (n.includes(term)) score += 50 * w;
+                if (m.includes(term)) score += 40 * w;
+                if (d.includes(term)) score += 30 * w;
+                if (mfr.includes(term)) score += 20 * w;
+                if (cat.includes(term)) score += 10 * w;
+                if (loc.includes(term)) score += 5 * w;
+            });
+        });
+        return score;
+    };
+
     return items
-        .map(item => ({ item, score: calculateRelevanceScore(item, keywords) }))
-        .filter(result => result.score >= 0)
+        .map(item => ({ item, score: scoreItem(item) }))
+        .filter(r => r.score >= 0)
         .sort((a, b) => {
-            // Primary: Relevance Score (Descending)
             if (b.score !== a.score) return b.score - a.score;
-            
-            // Secondary: Size (Ascending)
-            const dimCompare = compareDimensions(a.item.dimensions || a.item.size || '', b.item.dimensions || b.item.size || '');
+            const dimCompare = compareDimensions(
+                a.item.dimensions || a.item.size || '',
+                b.item.dimensions || b.item.size || ''
+            );
             if (dimCompare !== 0) return dimCompare;
-            
-            // Tertiary: Name (Alphabetical)
-            return (a.item.name || "").localeCompare(b.item.name || "", 'ja');
+            return (a.item.name || '').localeCompare(b.item.name || '', 'ja');
         })
-        .map(result => result.item);
+        .map(r => r.item);
 };
